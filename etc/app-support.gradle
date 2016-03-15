@@ -1,0 +1,23 @@
+// === Release keystore support ===
+
+if (getNotEmptyPropertyValue('bintray.user', null) == null) {
+    ext['bintray.user'] = System.getenv('BINTRAY_USER')
+}
+if (getNotEmptyPropertyValue('release.key.password', null) == null) {
+    ext['bintray.key'] = System.getenv('BINTRAY_KEY')
+}
+
+def secretPropertiesFile = rootProject.file('secret.properties')
+if (secretPropertiesFile.exists()) {
+    def secretPropertiesInputStream = secretPropertiesFile.newInputStream();
+    try {
+        def secretProperties = new Properties()
+        secretProperties.load(secretPropertiesInputStream)
+        secretProperties.each {
+            ext.set(it.key, it.value)
+        }
+    }
+    finally {
+        secretPropertiesInputStream.close()
+    }
+}

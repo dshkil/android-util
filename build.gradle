@@ -1,0 +1,49 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.5.0'
+    }
+}
+
+ext {
+    minSdkVersion = 22
+    compileSdkVersion = 23
+    buildToolsVersion = '23.0.2'
+}
+
+allprojects {
+    buildscript {
+        repositories {
+            jcenter()
+        }
+    }
+    repositories {
+        jcenter()
+    }
+    apply from: rootProject.file('etc/app-support.gradle')
+}
+
+// === Utils ===
+
+String getPropertyValue(String name, String defaultValue) {
+    if (project.hasProperty(name)) {
+        return project.getProperty(name)
+    }
+    return defaultValue
+}
+
+String getPropertyValue(String name) {
+    return getPropertyValue(name, null)
+}
+
+String getNotEmptyPropertyValue(String name, String defaultValue) {
+    if (project.hasProperty(name)) {
+        String value = project.getProperty(name)
+        if (value.length() > 0 && value != 'default') {
+            return value;
+        }
+    }
+    return defaultValue
+}

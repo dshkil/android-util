@@ -1,0 +1,3 @@
+rootProject.name='android-util-root'
+
+include ':common'
