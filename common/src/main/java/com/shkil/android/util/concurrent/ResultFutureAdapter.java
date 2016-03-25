@@ -84,13 +84,13 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
-    public Result<V> getResult() {
-        return handleResult(sourceFuture.getResult());
+    public Result<V> awaitResult() {
+        return handleResult(sourceFuture.awaitResult());
     }
 
     @Override
-    public Result<V> getResult(long timeout, TimeUnit unit) throws TimeoutException {
-        return handleResult(sourceFuture.getResult(timeout, unit));
+    public Result<V> awaitResult(long timeout, TimeUnit unit) throws TimeoutException {
+        return handleResult(sourceFuture.awaitResult(timeout, unit));
     }
 
     @Override
