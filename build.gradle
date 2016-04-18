@@ -2,9 +2,12 @@ ext {
     minSdkVersion = 22
     compileSdkVersion = 23
     buildToolsVersion = '23.0.2'
+
+    projectVersion = '0.9.1'
+    projectVersionCode = 2
 }
 
-subprojects {
+allprojects {
     buildscript {
         repositories {
             jcenter()

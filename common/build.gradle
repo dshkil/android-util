@@ -11,12 +11,13 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.github.dcendents.android-maven'
 apply plugin: 'com.jfrog.bintray'
 
-def projectVersion = '0.9.0'
+def params = rootProject.ext
+
 def projectArtifactId = 'android-util-common'
 def projectArtifactName = projectArtifactId
 
 group = GROUP
-version = projectVersion
+version = params.projectVersion
 
 
 dependencies {
@@ -24,15 +25,13 @@ dependencies {
     compile 'com.google.code.findbugs:jsr305:2.0.1'
 }
 
-def params = rootProject.ext
-
 android {
     compileSdkVersion params.compileSdkVersion
     buildToolsVersion params.buildToolsVersion
 
     defaultConfig {
-        versionName projectVersion
-        versionCode 1
+        versionName params.projectVersion
+        versionCode params.projectVersionCode
     }
 
     compileOptions {
