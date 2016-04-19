@@ -86,12 +86,12 @@ public class ResultFutures {
         }
 
         @Override
-        public Result<V> awaitResult() {
+        public Result<V> await() {
             return result;
         }
 
         @Override
-        public Result<V> awaitResult(long timeout, TimeUnit unit) {
+        public Result<V> await(long timeout, TimeUnit unit) {
             return result;
         }
 

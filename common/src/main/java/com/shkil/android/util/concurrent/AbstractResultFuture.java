@@ -61,16 +61,16 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public final Result<V> awaitResult() {
+    public final Result<V> await() {
         try {
-            return awaitResult(0L, null);
+            return await(0L, null);
         } catch (TimeoutException ex) {
             return Result.failure(ex); // actually should never happens
         }
     }
 
     @Override
-    public final Result<V> awaitResult(long time, TimeUnit units) throws TimeoutException {
+    public final Result<V> await(long time, TimeUnit units) throws TimeoutException {
         checkResultCallerThread();
         if (result != null) {
             return result;
@@ -137,7 +137,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         if (isResultReady()) {
             Result<V> result = this.result;
             if (result == null) {
-                result = awaitResult();
+                result = await();
             }
             if (result != null) {
                 if (resultExecutor != null) {

@@ -36,7 +36,7 @@ public interface ResultFuture<V> {
      * @throws InterruptedException if the current thread was interrupted while waiting
      */
     @Nonnull
-    Result<V> awaitResult();
+    Result<V> await();
 
     /**
      * Waits if necessary for at most the given time for the computation
@@ -50,7 +50,7 @@ public interface ResultFuture<V> {
      * @throws TimeoutException if the wait timed out
      */
     @Nonnull
-    Result<V> awaitResult(long timeout, TimeUnit unit) throws TimeoutException;
+    Result<V> await(long timeout, TimeUnit unit) throws TimeoutException;
 
     /**
      * Immediately returns result, if available, or null
