@@ -1,8 +1,8 @@
 buildscript {
     dependencies {
-        classpath "com.android.tools.build:gradle:1.5.0"
-        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.3'
-        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.6'
+        classpath "com.android.tools.build:gradle:2.1.3"
+        classpath 'com.github.dcendents:android-maven-gradle-plugin:1.5'
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7'
     }
 }
 
@@ -11,12 +11,13 @@ apply plugin: 'maven-publish'
 apply plugin: 'com.github.dcendents.android-maven'
 apply plugin: 'com.jfrog.bintray'
 
-def projectVersion = '0.9.0'
+def params = rootProject.ext
+
 def projectArtifactId = 'android-util-logger'
 def projectArtifactName = projectArtifactId
 
 group = GROUP
-version = projectVersion
+version = params.projectVersion
 
 
 dependencies {
@@ -25,15 +26,13 @@ dependencies {
     }
 }
 
-def params = rootProject.ext
-
 android {
     compileSdkVersion params.compileSdkVersion
     buildToolsVersion params.buildToolsVersion
 
     defaultConfig {
-        versionName projectVersion
-        versionCode 1
+        versionName params.projectVersion
+        versionCode params.projectVersionCode
     }
 
     compileOptions {
