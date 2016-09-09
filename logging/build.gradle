@@ -13,7 +13,7 @@ apply plugin: 'com.jfrog.bintray'
 
 def params = rootProject.ext
 
-def projectArtifactId = 'android-util-logger'
+def projectArtifactId = 'android-util-logging'
 def projectArtifactName = projectArtifactId
 
 group = GROUP
@@ -33,6 +33,8 @@ android {
     defaultConfig {
         versionName params.projectVersion
         versionCode params.projectVersionCode
+        minSdkVersion params.minSdkVersion
+        targetSdkVersion params.targetSdkVersion
     }
 
     compileOptions {

@@ -33,6 +33,8 @@ android {
     defaultConfig {
         versionName params.projectVersion
         versionCode params.projectVersionCode
+        minSdkVersion params.minSdkVersion
+        targetSdkVersion params.targetSdkVersion
     }
 
     compileOptions {
