@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2015-2016 Dmytro Shkil
  * Copyright (c) 2015 Netpulse
  * Copyright (c) 2004-2011 QOS.ch

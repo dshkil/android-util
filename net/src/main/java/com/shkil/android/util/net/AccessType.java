@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.shkil.android.util.net.exception;
+package com.shkil.android.util.net;
 
-public class AuthenticationException extends Exception {
+import com.shkil.android.util.Utils;
 
-    private static final long serialVersionUID = 1L;
+public enum AccessType {
 
-    public AuthenticationException(String message) {
-        super(message);
+    DEFAULT, CLIENT_TOKEN, USER_TOKEN;
+
+    public static AccessType valueOf(String name, AccessType defaultValue) {
+        return Utils.valueOf(name, AccessType.class, defaultValue);
     }
 
 }

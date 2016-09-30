@@ -15,36 +15,51 @@
  */
 package com.shkil.android.util.net.exception;
 
-import com.shkil.android.util.Utils;
-
 import java.io.IOException;
+
+import static com.shkil.android.util.Utils.isNotEmpty;
 
 public class ServerMessageException extends IOException {
 
     private static final long serialVersionUID = 1L;
 
-    private final String type;
+    private final String code;
+    private final Object payload;
 
     public ServerMessageException(String message) {
         this(message, null);
     }
 
-    public ServerMessageException(String message, String type) {
+    public ServerMessageException(String message, String code) {
         super(message);
-        this.type = type;
+        this.code = code;
+        this.payload = null;
     }
 
-    public String getType() {
-        return type;
+    public ServerMessageException(String message, String code, Object payload) {
+        super(message);
+        this.code = code;
+        this.payload = payload;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public <T> T getPayload(Class<T> type, boolean mandatory) {
+        if (mandatory || type.isInstance(payload)) {
+            return (T) payload;
+        }
+        return null;
     }
 
     @Override
     public String getLocalizedMessage() {
         String message = super.getMessage();
-        if (Utils.isNotEmpty(message)) {
-            return message + " / Type=" + type;
+        if (isNotEmpty(message)) {
+            return message + " / Code=" + code;
         }
-        return "Type=" + type;
+        return "Code=" + code;
     }
 
 }

@@ -15,16 +15,36 @@
  */
 package com.shkil.android.util.net.exception;
 
-public class AccessTokenException extends ServerMessageException {
+import java.io.IOException;
+
+public class AccessTokenException extends IOException {
 
     private static final long serialVersionUID = 1L;
 
+    public static final String CODE_INVALID = "token-invalid";
+    public static final String CODE_EXPIRED = "token-expired";
+
+    private final String errorCode;
+
     public AccessTokenException(String message) {
-        this(message, null);
+        this(message, null, null);
     }
 
-    public AccessTokenException(String message, String type) {
-        super(message, type);
+    public AccessTokenException(String message, Throwable cause) {
+        this(message, null, cause);
+    }
+
+    public AccessTokenException(String message, String errorCode) {
+        this(message, errorCode, null);
+    }
+
+    public AccessTokenException(String message, String errorCode, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
     }
 
 }

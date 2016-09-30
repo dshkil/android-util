@@ -15,25 +15,62 @@
  */
 package com.shkil.android.util.net;
 
-import com.shkil.android.util.net.exception.AuthenticationException;
-
 import java.util.Map;
 
+import okhttp3.Credentials;
+import okhttp3.FormBody;
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
 import static com.shkil.android.util.Utils.isEmpty;
 import static com.shkil.android.util.Utils.isNotEmpty;
+import static com.shkil.android.util.net.AbstractNetClient.FLAG_DESIRED;
+import static com.shkil.android.util.net.AbstractNetClient.FLAG_REQUIRED;
+import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION;
+import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION_FLAG;
 
 public abstract class RequestBuilder {
 
     private final HttpMethod method;
     private final HttpUrl.Builder urlBuilder;
     private final Request.Builder requestBuilder;
-    private MultipartBody.Builder multipartBodyBuilder;
-    private boolean inMultipartBody;
+    private RequestBody requestBody;
+    private BodyBuilder requestBodyBuilder;
+    private boolean inRequestBodyBuilder;
+
+    private interface BodyBuilder {
+        void addParam(String name, String value);
+        RequestBody build();
+    }
+
+    private static class MultipartBodyBuilder implements BodyBuilder {
+        private MultipartBody.Builder builder = new MultipartBody.Builder();
+        @Override
+        public void addParam(String name, String value) {
+            builder.addFormDataPart(name, value);
+        }
+
+        @Override
+        public RequestBody build() {
+            return builder.build();
+        }
+    }
+
+    private static class FormBodyBuilder implements BodyBuilder {
+        private FormBody.Builder builder = new FormBody.Builder();
+        @Override
+        public void addParam(String name, String value) {
+            builder.add(name, value);
+        }
+
+        @Override
+        public RequestBody build() {
+            return builder.build();
+        }
+    }
 
     public RequestBuilder(HttpMethod method, String uri) {
         this.method = method;
@@ -43,19 +80,21 @@ public abstract class RequestBuilder {
 
     protected abstract HttpUrl.Builder makeUrlBuilder(String uri);
 
-    protected abstract void addAuthToken() throws AuthenticationException;
+    public final RequestBuilder requireAuthToken() {
+        return requireAuthToken(AccessType.DEFAULT);
+    }
 
-    public final RequestBuilder addAuthTokenOptional() {
-        try {
-            addAuthToken();
-        } catch (AuthenticationException e) {
-            // do nothing
-        }
+    public final RequestBuilder requireAuthToken(AccessType type) {
+        addHeader(HEADER_AUTHORIZATION_FLAG, FLAG_REQUIRED + ":" + type);
         return this;
     }
 
-    public final RequestBuilder addAuthTokenMandatory() throws AuthenticationException {
-        addAuthToken();
+    public final RequestBuilder provideAuthToken() {
+        return provideAuthToken(AccessType.DEFAULT);
+    }
+
+    public final RequestBuilder provideAuthToken(AccessType type) {
+        addHeader(HEADER_AUTHORIZATION_FLAG, FLAG_DESIRED + ":" + type.name());
         return this;
     }
 
@@ -67,20 +106,47 @@ public abstract class RequestBuilder {
         if (method != HttpMethod.POST) {
             throw new IllegalStateException("Not supported for method " + method);
         }
-        if (inMultipartBody) {
+        if (inRequestBodyBuilder || requestBody != null) {
             throw new IllegalStateException();
         }
-        this.multipartBodyBuilder = new MultipartBody.Builder();
-        this.inMultipartBody = true;
+        this.requestBodyBuilder = new MultipartBodyBuilder();
+        this.inRequestBodyBuilder = true;
         return this;
     }
 
-    public RequestBuilder endMultipartBody() {
-        if (inMultipartBody) {
-            this.inMultipartBody = false;
+    public RequestBuilder beginFormBody() {
+        if (method != HttpMethod.POST) {
+            throw new IllegalStateException("Not supported for method " + method);
+        }
+        if (inRequestBodyBuilder || requestBody != null) {
+            throw new IllegalStateException();
+        }
+        this.requestBodyBuilder = new FormBodyBuilder();
+        this.inRequestBodyBuilder = true;
+        return this;
+    }
+
+    public RequestBuilder endBody() {
+        if (inRequestBodyBuilder) {
+            this.inRequestBodyBuilder = false;
         } else {
             throw new IllegalStateException();
         }
+        return this;
+    }
+
+    public RequestBuilder data(MediaType contentType, String data) {
+        return body(RequestBody.create(contentType, data));
+    }
+
+    public RequestBuilder body(RequestBody requestBody) {
+        if (method != HttpMethod.POST) {
+            throw new IllegalStateException("Not supported for method " + method);
+        }
+        if (requestBodyBuilder != null) {
+            throw new IllegalStateException();
+        }
+        this.requestBody = requestBody;
         return this;
     }
 
@@ -110,17 +176,31 @@ public abstract class RequestBuilder {
     }
 
     public RequestBuilder addParam(String name, String value) {
-        if (inMultipartBody) {
-            multipartBodyBuilder.addFormDataPart(name, value);
+        if (inRequestBodyBuilder) {
+            requestBodyBuilder.addParam(name, value);
         } else {
             urlBuilder.addQueryParameter(name, value);
         }
         return this;
     }
 
-    public RequestBuilder addParamMandatory(String name, String value) throws IllegalArgumentException {
+    public RequestBuilder addParamNotEmpty(String name, String value) throws IllegalArgumentException {
         if (isEmpty(value)) {
             throw new IllegalArgumentException("Value of '" + name + "' is empty");
+        }
+        return addParam(name, value);
+    }
+
+    public RequestBuilder addParamNotZero(String name, long value) throws IllegalArgumentException {
+        if (value == 0) {
+            throw new IllegalArgumentException("Value of '" + name + "' is zero");
+        }
+        return addParam(name, value);
+    }
+
+    public RequestBuilder addParamNotZero(String name, int value) throws IllegalArgumentException {
+        if (value == 0) {
+            throw new IllegalArgumentException("Value of '" + name + "' is zero");
         }
         return addParam(name, value);
     }
@@ -183,15 +263,28 @@ public abstract class RequestBuilder {
         return this;
     }
 
+    /**
+     * Basic HTTP Authentication credentials
+     */
+    public RequestBuilder basicAuthorization(String username, String password) {
+        requestBuilder.header(HEADER_AUTHORIZATION, Credentials.basic(username, password));
+        return this;
+    }
+
+    public RequestBuilder tag(Object tag) {
+        requestBuilder.tag(tag);
+        return this;
+    }
+
     public Request build() {
-        if (inMultipartBody) {
-            throw new IllegalStateException("Multipart body is not ended");
+        if (inRequestBodyBuilder) {
+            throw new IllegalStateException("Body is not ended");
         }
-        RequestBody requestBody;
-        if (multipartBodyBuilder != null) {
-            requestBody = multipartBodyBuilder.build();
-        } else {
-            requestBody = null;
+        if (requestBodyBuilder != null) {
+            if (requestBody != null) {
+                throw new IllegalStateException();
+            }
+            requestBody = requestBodyBuilder.build();
         }
         HttpUrl httpUrl = urlBuilder.build();
         return requestBuilder
