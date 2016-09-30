@@ -28,16 +28,26 @@ package com.shkil.android.util.logging;
 
 import android.util.Log;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 public class AndroidLoggerAdapter implements Logger {
 
     private final String name;
 
-    private static volatile int LEVEL = Log.VERBOSE;
+    private static int level = Log.VERBOSE;
+    private static boolean skipLoggabilityCheck;
 
-    public static int setLevel(int level) {
-        int oldLevel = LEVEL;
-        LEVEL = level;
-        return oldLevel;
+    public static synchronized int setLevel(int level) {
+        int oldValue = AndroidLoggerAdapter.level;
+        AndroidLoggerAdapter.level = level;
+        return oldValue;
+    }
+
+    public static synchronized boolean setSkipLoggabilityCheck(boolean skip) {
+        boolean oldValue = AndroidLoggerAdapter.skipLoggabilityCheck;
+        AndroidLoggerAdapter.skipLoggabilityCheck = skip;
+        return oldValue;
     }
 
     protected AndroidLoggerAdapter(String name) {
@@ -239,12 +249,12 @@ public class AndroidLoggerAdapter implements Logger {
     }
 
     private boolean isLoggable(int priority) {
-        return priority >= LEVEL && Log.isLoggable(name, priority);
+        return priority >= level && (skipLoggabilityCheck || Log.isLoggable(name, priority));
     }
 
     private void printLog(int priority, String message, Throwable throwable) {
         if (throwable != null) {
-            message += '\n' + Log.getStackTraceString(throwable);
+            message += '\n' + getStackTraceString(throwable);
         }
         Log.println(priority, name, message);
     }
@@ -261,6 +271,17 @@ public class AndroidLoggerAdapter implements Logger {
             }
         }
         return null;
+    }
+
+    private static String getStackTraceString(Throwable throwable) {
+        if (throwable == null) {
+            return "";
+        }
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        throwable.printStackTrace(printWriter);
+        printWriter.flush();
+        return stringWriter.toString();
     }
 
 }
