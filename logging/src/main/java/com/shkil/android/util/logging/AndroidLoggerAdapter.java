@@ -28,11 +28,17 @@ package com.shkil.android.util.logging;
 
 import android.util.Log;
 
-class AndroidLoggerAdapter implements Logger {
+public class AndroidLoggerAdapter implements Logger {
 
     private final String name;
 
-    public static volatile int LEVEL = Log.INFO;
+    private static volatile int LEVEL = Log.VERBOSE;
+
+    public static int setLevel(int level) {
+        int oldLevel = LEVEL;
+        LEVEL = level;
+        return oldLevel;
+    }
 
     protected AndroidLoggerAdapter(String name) {
         this.name = name;

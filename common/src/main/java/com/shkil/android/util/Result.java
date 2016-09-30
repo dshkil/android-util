@@ -74,6 +74,10 @@ public class Result<V> {
         return exception == null;
     }
 
+    public boolean isNotSuccess() {
+        return exception != null;
+    }
+
     public boolean isInterrupted() {
         return interrupted;
     }

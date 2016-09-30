@@ -1,11 +1,11 @@
 ext {
-    minSdkVersion = 15
+    minSdkVersion = 14
     targetSdkVersion = 24
     compileSdkVersion = 24
-    buildToolsVersion = '24.0.2'
+    buildToolsVersion = '24.0.3'
 
-    projectVersion = '0.9.3'
-    projectVersionCode = 3
+    projectVersion = '0.9.4'
+    projectVersionCode = 4
 }
 
 allprojects {

@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest
-    package="com.shkil.android.util.common"
-    xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <uses-sdk
-        android:targetSdkVersion="23"/>
+    package="com.shkil.android.util.common">
 
     <application/>
 
