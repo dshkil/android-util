@@ -20,15 +20,12 @@ import android.support.annotation.NonNull;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shkil.android.util.net.ResponseParser;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Type;
 
-import okhttp3.Response;
-
-public class JacksonDatabindResponseParser implements ResponseParser {
+public class JacksonDatabindResponseParser extends AbstractResponseParser {
 
     public static ObjectMapper createObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -57,22 +54,16 @@ public class JacksonDatabindResponseParser implements ResponseParser {
         return objectMapper;
     }
 
-    @Override
-    public <T> T parseResponse(Response response, Type resultType) throws IOException {
-        Reader streamReader = response.body().charStream();
-        try {
-            return readObject(streamReader, resultType);
-        } finally {
-            streamReader.close();
-        }
-    }
-
     protected <T> T readObject(Reader reader, Type type) throws IOException {
-        if (type instanceof Class<?>) {
-            return objectMapper.readValue(reader, (Class<T>) type);
-        }
-        if (type instanceof JavaType) {
-            return objectMapper.readValue(reader, (JavaType) type);
+        try {
+            if (type instanceof Class<?>) {
+                return objectMapper.readValue(reader, (Class<T>) type);
+            }
+            if (type instanceof JavaType) {
+                return objectMapper.readValue(reader, (JavaType) type);
+            }
+        } catch (RuntimeException ex) {
+            throw new IOException(ex);
         }
         throw new IllegalArgumentException("type");
     }
