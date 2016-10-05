@@ -56,25 +56,20 @@ public class JacksonDatabindResponseParser extends AbstractResponseParser {
 
     protected <T> T readObject(Reader reader, Type type) throws IOException {
         try {
-            if (type instanceof Class<?>) {
-                return objectMapper.readValue(reader, (Class<T>) type);
-            }
-            if (type instanceof JavaType) {
-                return objectMapper.readValue(reader, (JavaType) type);
-            }
+            JavaType javaType = objectMapper.constructType(type);
+            return objectMapper.readValue(reader, javaType);
         } catch (RuntimeException ex) {
             throw new IOException(ex);
         }
-        throw new IllegalArgumentException("type");
     }
 
     public JacksonDatabindResponseParser addMixIn(Class<?> target, Class<?> mixinSource) {
-        getObjectMapper().addMixIn(target, mixinSource);
+        objectMapper.addMixIn(target, mixinSource);
         return this;
     }
 
     public JacksonDatabindResponseParser configure(DeserializationFeature feature, boolean state) {
-        getObjectMapper().configure(feature, state);
+        objectMapper.configure(feature, state);
         return this;
     }
 
