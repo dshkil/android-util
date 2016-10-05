@@ -15,6 +15,9 @@
  */
 package com.shkil.android.util.net;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 import java.util.Map;
 
 import okhttp3.Credentials;
@@ -72,11 +75,11 @@ public class RequestBuilder {
         }
     }
 
-    public RequestBuilder(HttpMethod method, String uri) {
+    public RequestBuilder(@NonNull HttpMethod method, @NonNull String uri) {
         this(method, null, uri);
     }
 
-    public RequestBuilder(HttpMethod method, HttpUrl baseUrl, String uri) {
+    public RequestBuilder(@NonNull HttpMethod method, @Nullable HttpUrl baseUrl, @NonNull String uri) {
         if (method == null) {
             throw new NullPointerException("method");
         }
@@ -91,11 +94,19 @@ public class RequestBuilder {
         this.requestBuilder = new Request.Builder();
     }
 
-    protected HttpUrl.Builder createUrlBuilder(HttpUrl baseUrl, String uri) {
-        if (baseUrl != null) {
-            return baseUrl.newBuilder(uri);
+    protected HttpUrl.Builder createUrlBuilder(@Nullable HttpUrl baseUrl, @NonNull String uri) {
+        if (baseUrl == null || uri.startsWith("http://") || uri.startsWith("https://")) {
+            HttpUrl url = HttpUrl.parse(uri);
+            if (url == null) {
+                throw new IllegalArgumentException("URL is not well-formed");
+            }
+            return url.newBuilder();
         }
-        return HttpUrl.parse(uri).newBuilder();
+        HttpUrl.Builder result = baseUrl.newBuilder(uri);
+        if (result == null) {
+            throw new IllegalArgumentException("URI is not well-formed");
+        }
+        return result;
     }
 
     public final RequestBuilder requireAuthToken() {
@@ -121,9 +132,7 @@ public class RequestBuilder {
     }
 
     public RequestBuilder beginMultipartBody() {
-        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
-            throw new IllegalStateException("Not supported for method " + method);
-        }
+        checkMethodSupportsBody(method);
         if (inRequestBodyBuilder || requestBody != null) {
             throw new IllegalStateException();
         }
@@ -133,9 +142,7 @@ public class RequestBuilder {
     }
 
     public RequestBuilder beginFormBody() {
-        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
-            throw new IllegalStateException("Not supported for method " + method);
-        }
+        checkMethodSupportsBody(method);
         if (inRequestBodyBuilder || requestBody != null) {
             throw new IllegalStateException();
         }
@@ -153,19 +160,27 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder data(MediaType contentType, String data) {
-        return body(RequestBody.create(contentType, data));
-    }
-
     public RequestBuilder body(RequestBody requestBody) {
-        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
-            throw new IllegalStateException("Not supported for method " + method);
-        }
+        checkMethodSupportsBody(method);
         if (requestBodyBuilder != null) {
             throw new IllegalStateException();
         }
         this.requestBody = requestBody;
         return this;
+    }
+
+    public RequestBuilder data(MediaType contentType, String data) {
+        return body(RequestBody.create(contentType, data));
+    }
+
+    private static void checkMethodSupportsBody(HttpMethod method) throws IllegalStateException {
+        switch (method) {
+            case POST:
+            case PUT:
+            case PATCH:
+                return;
+        }
+        throw new IllegalStateException("Not supported for method " + method);
     }
 
     public RequestBuilder addParams(Map<String, String> map) {
@@ -284,7 +299,7 @@ public class RequestBuilder {
     /**
      * Basic HTTP Authentication credentials
      */
-    public RequestBuilder basicAuthorization(String username, String password) {
+    public RequestBuilder basicAuthentication(String username, String password) {
         requestBuilder.header(HEADER_AUTHORIZATION, Credentials.basic(username, password));
         return this;
     }
