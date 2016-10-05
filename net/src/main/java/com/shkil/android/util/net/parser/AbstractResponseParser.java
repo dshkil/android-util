@@ -17,21 +17,45 @@ package com.shkil.android.util.net.parser;
 
 import com.shkil.android.util.net.ResponseParser;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Type;
 
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
-abstract class AbstractResponseParser implements ResponseParser {
+public abstract class AbstractResponseParser implements ResponseParser {
 
     public <T> T parseResponse(Response response, Type resultType) throws IOException {
-        Reader streamReader = response.body().charStream();
+        ResponseBody responseBody = response.body();
+        T object = readStandardType(responseBody, resultType);
+        if (object != null) {
+            return object;
+        }
+        Reader streamReader = responseBody.charStream();
         try {
             return readObject(streamReader, resultType);
         } finally {
             streamReader.close();
         }
+    }
+
+    protected <T> T readStandardType(ResponseBody body, Type resultType) throws IOException {
+        if (resultType == String.class) {
+            return (T) body.string();
+        } else if (resultType == JSONObject.class) {
+            try {
+                return (T) new JSONObject(body.string());
+            } catch (JSONException ex) {
+                throw new IOException(ex);
+            }
+        } else if (resultType == byte[].class) {
+            return (T) body.bytes();
+        }
+        return null;
     }
 
     protected abstract <T> T readObject(Reader reader, Type type) throws IOException;

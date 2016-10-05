@@ -32,7 +32,7 @@ import static com.shkil.android.util.net.AbstractNetClient.FLAG_REQUIRED;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION_FLAG;
 
-public abstract class RequestBuilder {
+public class RequestBuilder {
 
     private final HttpMethod method;
     private final HttpUrl.Builder urlBuilder;
@@ -73,12 +73,30 @@ public abstract class RequestBuilder {
     }
 
     public RequestBuilder(HttpMethod method, String uri) {
+        this(method, null, uri);
+    }
+
+    public RequestBuilder(HttpMethod method, HttpUrl baseUrl, String uri) {
+        if (method == null) {
+            throw new NullPointerException("method");
+        }
+        if (uri == null) {
+            throw new NullPointerException("uri");
+        }
+        if (baseUrl == null && isEmpty(uri)) {
+            throw new IllegalArgumentException("uri");
+        }
         this.method = method;
-        this.urlBuilder = makeUrlBuilder(uri);
+        this.urlBuilder = createUrlBuilder(baseUrl, uri);
         this.requestBuilder = new Request.Builder();
     }
 
-    protected abstract HttpUrl.Builder makeUrlBuilder(String uri);
+    protected HttpUrl.Builder createUrlBuilder(HttpUrl baseUrl, String uri) {
+        if (baseUrl != null) {
+            return baseUrl.newBuilder(uri);
+        }
+        return HttpUrl.parse(uri).newBuilder();
+    }
 
     public final RequestBuilder requireAuthToken() {
         return requireAuthToken(AccessType.DEFAULT);
@@ -103,7 +121,7 @@ public abstract class RequestBuilder {
     }
 
     public RequestBuilder beginMultipartBody() {
-        if (method != HttpMethod.POST) {
+        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
             throw new IllegalStateException("Not supported for method " + method);
         }
         if (inRequestBodyBuilder || requestBody != null) {
@@ -115,7 +133,7 @@ public abstract class RequestBuilder {
     }
 
     public RequestBuilder beginFormBody() {
-        if (method != HttpMethod.POST) {
+        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
             throw new IllegalStateException("Not supported for method " + method);
         }
         if (inRequestBodyBuilder || requestBody != null) {
@@ -140,7 +158,7 @@ public abstract class RequestBuilder {
     }
 
     public RequestBuilder body(RequestBody requestBody) {
-        if (method != HttpMethod.POST) {
+        if (method != HttpMethod.POST && method != HttpMethod.PUT && method != HttpMethod.PATCH) {
             throw new IllegalStateException("Not supported for method " + method);
         }
         if (requestBodyBuilder != null) {

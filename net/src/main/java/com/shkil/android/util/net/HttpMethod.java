@@ -17,6 +17,6 @@ package com.shkil.android.util.net;
 
 public enum HttpMethod {
 
-    GET, POST
+    GET, POST, PUT, PATCH, DELETE, HEAD
 
 }
