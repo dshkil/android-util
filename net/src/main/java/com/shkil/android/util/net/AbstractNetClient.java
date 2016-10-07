@@ -108,19 +108,19 @@ public abstract class AbstractNetClient {
 
     protected abstract RequestBuilder newRequestBuilder(HttpMethod method, String uri);
 
-    protected RequestBuilder newGetRequestBuilder(String uri) {
+    protected final RequestBuilder newGetRequestBuilder(String uri) {
         return newRequestBuilder(HttpMethod.GET, uri);
     }
 
-    protected RequestBuilder newGetRequestBuilder(String uri, Object... args) {
+    protected final RequestBuilder newGetRequestBuilder(String uri, Object... args) {
         return newRequestBuilder(HttpMethod.GET, String.format(uri, args));
     }
 
-    protected RequestBuilder newPostRequestBuilder(String uri) {
+    protected final RequestBuilder newPostRequestBuilder(String uri) {
         return newRequestBuilder(HttpMethod.POST, uri);
     }
 
-    protected RequestBuilder newPostRequestBuilder(String uri, Object... args) {
+    protected final RequestBuilder newPostRequestBuilder(String uri, Object... args) {
         return newRequestBuilder(HttpMethod.POST, String.format(uri, args));
     }
 
@@ -136,12 +136,20 @@ public abstract class AbstractNetClient {
         throw new UnsupportedOperationException("Should be overridden for concrete implementation");
     }
 
-    protected Response execute(Request request) throws IOException {
+    protected boolean isTokenExpired(AccessToken accessToken) {
+        return accessToken.getExpiresAt() - EXPIRATION_ADVANCE_MILLIS <= currentTimeMillis();
+    }
+
+    protected final Response execute(Request request) throws IOException {
+        return execute(request, false);
+    }
+
+    protected final Response execute(Request request, boolean skipResponseCheck) throws IOException {
         String authFlag = request.header(HEADER_AUTHORIZATION_FLAG);
         boolean tokenRequired = authFlag != null && authFlag.startsWith(FLAG_REQUIRED);
         boolean tokenDesired = authFlag != null && authFlag.startsWith(FLAG_DESIRED);
+        AccessType accessType = getAccessType(authFlag);
         if (tokenRequired || tokenDesired) {
-            AccessType accessType = getAccessType(authFlag);
             AccessToken accessToken = getAccessToken(accessType);
             try {
                 Request.Builder requestBuilder = request.newBuilder();
@@ -169,29 +177,6 @@ public abstract class AbstractNetClient {
                 }
             }
         }
-        return execute(request, false);
-    }
-
-    protected boolean isTokenExpired(AccessToken accessToken) {
-        return accessToken.getExpiresAt() - EXPIRATION_ADVANCE_MILLIS <= currentTimeMillis();
-    }
-
-    private static AccessType getAccessType(String authFlag) {
-        if (isNotEmpty(authFlag)) {
-            String type;
-            if (authFlag.startsWith(FLAG_REQUIRED)) {
-                type = authFlag.substring(FLAG_REQUIRED.length() + 1);
-            }  else if (authFlag.startsWith(FLAG_DESIRED)) {
-                type = authFlag.substring(FLAG_DESIRED.length() + 1);
-            } else {
-                throw new IllegalArgumentException();
-            }
-            return AccessType.valueOf(type);
-        }
-        return AccessType.DEFAULT;
-    }
-
-    protected Response execute(Request request, boolean skipResponseCheck) throws IOException {
         Response response = newCall(request).execute();
         if (skipResponseCheck) {
             return response;
@@ -200,8 +185,6 @@ public abstract class AbstractNetClient {
             checkResponse(response);
         } catch (AuthException | AccessTokenException ex) {
             closeResponse(response);
-            String authFlag = request.header(HEADER_AUTHORIZATION_FLAG);
-            AccessType accessType = getAccessType(authFlag);
             onAuthException(ex, accessType);
             throw ex;
         } catch (IOException ex) {
@@ -248,7 +231,7 @@ public abstract class AbstractNetClient {
 
     protected abstract ResponseParser createResponseParser();
 
-    protected ResultFuture<Response> executeSerialAsync(final Request request) {
+    protected final ResultFuture<Response> executeSerialAsync(final Request request) {
         return executeSerialAsync(new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -257,7 +240,7 @@ public abstract class AbstractNetClient {
         });
     }
 
-    protected ResultFuture<Response> executeAsync(final Request request) {
+    protected final ResultFuture<Response> executeAsync(final Request request) {
         return executeAsync(new Callable<Response>() {
             @Override
             public Response call() throws Exception {
@@ -266,7 +249,7 @@ public abstract class AbstractNetClient {
         });
     }
 
-    protected <T> T execute(Request request, Type resultType) throws IOException {
+    protected final <T> T execute(Request request, Type resultType) throws IOException {
         Response response = execute(request);
         try {
             Object result = parseResponse(response, resultType);
@@ -276,7 +259,7 @@ public abstract class AbstractNetClient {
         }
     }
 
-    protected <T> ResultFuture<T> executeSerialAsync(final Request request, final Type resultType) {
+    protected final <T> ResultFuture<T> executeSerialAsync(final Request request, final Type resultType) {
         return executeSerialAsync(new Callable<T>() {
             @Override
             public T call() throws Exception {
@@ -285,7 +268,7 @@ public abstract class AbstractNetClient {
         });
     }
 
-    protected <T> ResultFuture<T> executeAsync(final Request request, final Type resultType) {
+    protected final <T> ResultFuture<T> executeAsync(final Request request, final Type resultType) {
         return executeAsync(new Callable<T>() {
             @Override
             public T call() throws Exception {
@@ -294,27 +277,27 @@ public abstract class AbstractNetClient {
         });
     }
 
-    protected Response execute(RequestBuilder requestBuilder) throws IOException {
+    protected final Response execute(RequestBuilder requestBuilder) throws IOException {
         return execute(requestBuilder.build());
     }
 
-    protected ResultFuture<Response> executeSerialAsync(RequestBuilder requestBuilder) {
+    protected final ResultFuture<Response> executeSerialAsync(RequestBuilder requestBuilder) {
         return executeSerialAsync(requestBuilder.build());
     }
 
-    protected ResultFuture<Response> executeAsync(RequestBuilder requestBuilder) {
+    protected final ResultFuture<Response> executeAsync(RequestBuilder requestBuilder) {
         return executeAsync(requestBuilder.build());
     }
 
-    protected <T> T execute(RequestBuilder requestBuilder, Type resultType) throws IOException {
+    protected final <T> T execute(RequestBuilder requestBuilder, Type resultType) throws IOException {
         return execute(requestBuilder.build(), resultType);
     }
 
-    protected <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, Type resultType) {
+    protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, Type resultType) {
         return executeSerialAsync(requestBuilder.build(), resultType);
     }
 
-    protected <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Type resultType) {
+    protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Type resultType) {
         return executeAsync(requestBuilder.build(), resultType);
     }
 
@@ -352,14 +335,29 @@ public abstract class AbstractNetClient {
         return new ServerMessageException(response.message(), String.valueOf(response.code()));
     }
 
-    protected static <V> ResultFuture<V> executeSerialAsync(Callable<V> task) {
+    protected <V> ResultFuture<V> executeSerialAsync(Callable<V> task) {
         return ResultFutures.executeTask(task, SerialExecutorLazyHolder.EXECUTOR)
                 .getResultFuture(MainThreadExecutor.getInstance(), true);
     }
 
-    protected static <V> ResultFuture<V> executeAsync(Callable<V> task) {
+    protected <V> ResultFuture<V> executeAsync(Callable<V> task) {
         return ResultFutures.executeTask(task, ThreadPoolExecutorLazyHolder.EXECUTOR)
                 .getResultFuture(MainThreadExecutor.getInstance(), true);
+    }
+
+    private static AccessType getAccessType(String authFlag) {
+        if (isNotEmpty(authFlag)) {
+            String type;
+            if (authFlag.startsWith(FLAG_REQUIRED)) {
+                type = authFlag.substring(FLAG_REQUIRED.length() + 1);
+            }  else if (authFlag.startsWith(FLAG_DESIRED)) {
+                type = authFlag.substring(FLAG_DESIRED.length() + 1);
+            } else {
+                throw new IllegalArgumentException();
+            }
+            return AccessType.valueOf(type);
+        }
+        return AccessType.DEFAULT;
     }
 
 }
