@@ -33,6 +33,8 @@ import java.io.StringWriter;
 
 public class AndroidLoggerAdapter implements Logger {
 
+    private static final String TAG = "AndroidLoggerAdapter";
+
     private final String name;
 
     private static int level = Log.VERBOSE;
@@ -249,7 +251,15 @@ public class AndroidLoggerAdapter implements Logger {
     }
 
     private boolean isLoggable(int priority) {
-        return priority >= level && (skipLoggabilityCheck || Log.isLoggable(name, priority));
+        return priority >= level && (skipLoggabilityCheck || isLoggableNative(name, priority));
+    }
+
+    private static boolean isLoggableNative(String tag, int priority) {
+        if (tag.length() > 23) {
+            Log.w(TAG, "Tag " + tag + " length is more than 23. Assumed as not loggable.");
+            return false;
+        }
+        return Log.isLoggable(tag, priority);
     }
 
     private void printLog(int priority, String message, Throwable throwable) {
