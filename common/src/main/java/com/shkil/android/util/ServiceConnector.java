@@ -21,9 +21,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.IInterface;
 import android.os.RemoteException;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public class ServiceConnector<T extends IInterface> {
+public class ServiceConnector<T> {
 
     private static final String TAG = "ServiceConnector";
 
@@ -46,6 +46,13 @@ public class ServiceConnector<T extends IInterface> {
 
     public interface ILocalBinder<I> {
         I getInterface();
+    }
+
+    public static abstract class AbstractLocalBinder<I> extends Binder implements ILocalBinder<I> {
+        @Override
+        public I getInterface() {
+            return (I) this;
+        }
     }
 
     private final Context context;

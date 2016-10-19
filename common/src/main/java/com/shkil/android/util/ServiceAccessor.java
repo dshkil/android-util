@@ -24,7 +24,7 @@ import android.util.Log;
 
 import com.shkil.android.util.common.BuildConfig;
 
-public abstract class ServiceAccessor<T extends IInterface> implements Releasable {
+public abstract class ServiceAccessor<T> implements Releasable {
 
     private static final String TAG = "ServiceAccessor";
 
