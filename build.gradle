@@ -36,7 +36,7 @@ String getPropertyValue(String name) {
 String getNotEmptyPropertyValue(String name, String defaultValue) {
     if (project.hasProperty(name)) {
         String value = project.getProperty(name)
-        if (value.length() > 0 && value != 'default') {
+        if (value != null && value.length() > 0 && value != 'default') {
             return value;
         }
     }
