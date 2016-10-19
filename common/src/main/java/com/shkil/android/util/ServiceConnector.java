@@ -44,6 +44,10 @@ public class ServiceConnector<T extends IInterface> {
 
     protected static final long MAX_CONNECTION_WAIT_MILLIS = SECONDS.toMillis(60);
 
+    public interface ILocalBinder<I> {
+        I getInterface();
+    }
+
     private final Context context;
     private final Intent serviceIntent;
     private final Class<T> interfaceClass;
@@ -132,6 +136,9 @@ public class ServiceConnector<T extends IInterface> {
 
     @SuppressWarnings("unchecked")
     protected T asInterface(IBinder binder) {
+        if (binder instanceof ILocalBinder) {
+            return ((ILocalBinder<T>) binder).getInterface();
+        }
         try {
             Class<T> stubClass = (Class<T>) Class.forName(interfaceClass.getName() + "$Stub");
             Method asInterfaceMethod = stubClass.getMethod("asInterface", IBinder.class);
