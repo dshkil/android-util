@@ -44,13 +44,13 @@ public class ServiceConnector<T> {
 
     protected static final long MAX_CONNECTION_WAIT_MILLIS = SECONDS.toMillis(60);
 
-    public interface ILocalBinder<I> {
-        I getInterface();
+    public interface ILocalBinder {
+        <I> I getInterface();
     }
 
-    public static abstract class AbstractLocalBinder<I> extends Binder implements ILocalBinder<I> {
+    public static abstract class AbstractLocalBinder extends Binder implements ILocalBinder {
         @Override
-        public I getInterface() {
+        public <I> I getInterface() {
             return (I) this;
         }
     }
@@ -144,7 +144,7 @@ public class ServiceConnector<T> {
     @SuppressWarnings("unchecked")
     protected T asInterface(IBinder binder) {
         if (binder instanceof ILocalBinder) {
-            return ((ILocalBinder<T>) binder).getInterface();
+            return ((ILocalBinder) binder).getInterface();
         }
         try {
             Class<T> stubClass = (Class<T>) Class.forName(interfaceClass.getName() + "$Stub");
