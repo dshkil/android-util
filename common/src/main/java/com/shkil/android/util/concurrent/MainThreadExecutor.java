@@ -43,7 +43,7 @@ public final class MainThreadExecutor implements Executor {
         handler.post(runnable);
     }
 
-    public static MainThreadExecutor getInstance() {
+    public static Executor getInstance() {
         return INSTANCE;
     }
 
