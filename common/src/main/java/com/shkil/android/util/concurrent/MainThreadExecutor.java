@@ -15,19 +15,21 @@
  */
 package com.shkil.android.util.concurrent;
 
-import android.os.Handler;
-import android.os.Looper;
-
 import java.util.concurrent.Executor;
 
-public final class MainThreadExecutor implements Executor {
+public class MainThreadExecutor implements Executor {
 
     private static final MainThreadExecutor INSTANCE = new MainThreadExecutor();
 
-    private static final Looper mainLooper = Looper.getMainLooper();
-    private static final Handler handler = new Handler(mainLooper);
+    public static MainThreadExecutor getInstance() {
+        return INSTANCE;
+    }
 
-    private MainThreadExecutor() {
+    public static MainThreadExecutor get() {
+        return INSTANCE;
+    }
+
+    protected MainThreadExecutor() {
     }
 
     @Override
@@ -35,20 +37,20 @@ public final class MainThreadExecutor implements Executor {
         if (isRunningOnMainThread()) {
             runnable.run();
         } else {
-            handler.post(runnable);
+            post(runnable);
         }
     }
 
     public void post(Runnable runnable) {
-        handler.post(runnable);
+        MainThread.HANDLER.post(runnable);
     }
 
-    public static Executor getInstance() {
-        return INSTANCE;
+    public void remove(Runnable runnable) {
+        MainThread.HANDLER.removeCallbacks(runnable);
     }
 
     protected static boolean isRunningOnMainThread() {
-        return Thread.currentThread() == mainLooper.getThread();
+        return Thread.currentThread() == MainThread.LOOPER.getThread();
     }
 
 }

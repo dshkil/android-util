@@ -22,9 +22,9 @@ import java.util.concurrent.Executor;
 
 public final class MainThread {
 
-    public static final Executor EXECUTOR = MainThreadExecutor.getInstance();
     public static final Looper LOOPER = Looper.getMainLooper();
     public static final Handler HANDLER = new Handler(LOOPER);
+    public static final MainThreadExecutor EXECUTOR = MainThreadExecutor.getInstance();
 
     private MainThread() {
     }
