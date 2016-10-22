@@ -88,19 +88,19 @@ public class EventBus {
         if (event == null) {
             throw new IllegalArgumentException("event == null");
         }
-        postEvent(event, false);
+        post(event, false);
     }
 
-    public void postEvent(IEvent event) {
-        postEvent(event, true);
+    public void post(IEvent event) {
+        post(event, true);
     }
 
-    private void postEvent(IEvent event, boolean original) {
+    private void post(IEvent event, boolean original) {
         if (original && traceAppEvents) {
             int priority = event.getLogLevel();
             if (priority > 0) {
                 //noinspection WrongConstant
-                Log.println(priority, TAG, "postEvent: " + event);
+                Log.println(priority, TAG, "post: " + event);
             }
         }
         if (Utils.isRunningOnMainThread()) {
