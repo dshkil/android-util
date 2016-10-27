@@ -18,6 +18,7 @@ package com.shkil.android.util.net;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import java.io.File;
 import java.util.Map;
 
 import okhttp3.Credentials;
@@ -27,6 +28,7 @@ import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import okio.ByteString;
 
 import static com.shkil.android.util.Utils.isEmpty;
 import static com.shkil.android.util.Utils.isNotEmpty;
@@ -136,7 +138,11 @@ public class RequestBuilder {
         if (inRequestBodyBuilder || requestBody != null) {
             throw new IllegalStateException();
         }
-        this.requestBodyBuilder = new MultipartBodyBuilder();
+        if (requestBodyBuilder == null) {
+            this.requestBodyBuilder = new MultipartBodyBuilder();
+        } else if (!(requestBodyBuilder instanceof MultipartBodyBuilder)) {
+            throw new IllegalStateException();
+        }
         this.inRequestBodyBuilder = true;
         return this;
     }
@@ -146,7 +152,11 @@ public class RequestBuilder {
         if (inRequestBodyBuilder || requestBody != null) {
             throw new IllegalStateException();
         }
-        this.requestBodyBuilder = new FormBodyBuilder();
+        if (requestBodyBuilder == null) {
+            this.requestBodyBuilder = new FormBodyBuilder();
+        } else if (!(requestBodyBuilder instanceof FormBodyBuilder)) {
+            throw new IllegalStateException();
+        }
         this.inRequestBodyBuilder = true;
         return this;
     }
@@ -160,17 +170,36 @@ public class RequestBuilder {
         return this;
     }
 
-    public RequestBuilder body(RequestBody requestBody) {
+    public RequestBuilder withBody(@NonNull RequestBody requestBody) {
         checkMethodSupportsBody(method);
-        if (requestBodyBuilder != null) {
+        if (requestBody == null) {
+            throw new NullPointerException("requestBody");
+        }
+        if (this.requestBody != null || requestBodyBuilder != null) {
             throw new IllegalStateException();
         }
         this.requestBody = requestBody;
         return this;
     }
 
-    public RequestBuilder data(MediaType contentType, String data) {
-        return body(RequestBody.create(contentType, data));
+    public RequestBuilder withBody(MediaType contentType, String content) {
+        return withBody(RequestBody.create(contentType, content));
+    }
+
+    public RequestBuilder withBody(MediaType contentType, byte[] content) {
+        return withBody(RequestBody.create(contentType, content));
+    }
+
+    public RequestBuilder withBody(MediaType contentType, byte[] content, int offset, int byteCount) {
+        return withBody(RequestBody.create(contentType, content, offset, byteCount));
+    }
+
+    public RequestBuilder withBody(MediaType contentType, ByteString content) {
+        return withBody(RequestBody.create(contentType, content));
+    }
+
+    public RequestBuilder withBody(MediaType contentType, File file) {
+        return withBody(RequestBody.create(contentType, file));
     }
 
     private static void checkMethodSupportsBody(HttpMethod method) throws IllegalStateException {
