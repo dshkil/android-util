@@ -26,6 +26,7 @@ import java.lang.reflect.Type;
 
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okio.ByteString;
 
 public abstract class AbstractResponseParser implements ResponseParser {
 
@@ -54,6 +55,8 @@ public abstract class AbstractResponseParser implements ResponseParser {
             }
         } else if (resultType == byte[].class) {
             return (T) body.bytes();
+        } else if (resultType == ByteString.class) {
+            return (T) body.source().readByteString();
         }
         return null;
     }

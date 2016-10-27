@@ -23,6 +23,7 @@ import java.io.IOException;
 import okhttp3.HttpUrl;
 import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
+import okio.ByteString;
 
 class HttpbinNetClient extends AbstractNetClient {
 
@@ -49,6 +50,11 @@ class HttpbinNetClient extends AbstractNetClient {
                 .addHeader("Header1", "h1")
                 .addHeader("header2", "h2");
         return execute(builder, JsonNode.class);
+    }
+
+    public ByteString doGetBytesRequest(int count) throws IOException {
+        RequestBuilder builder = newGetRequestBuilder("/bytes/" + count);
+        return execute(builder, ByteString.class);
     }
 
     public JsonNode doPostFormRequest() throws IOException {

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.Test;
 
 import okhttp3.Response;
+import okio.ByteString;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
@@ -39,6 +40,14 @@ public class AbstractNetClientTest {
         assertEquals("h1", headersNode.get("Header1").asText());
         assertEquals("h2", headersNode.get("Header2").asText());
         assertEquals("http://httpbin.org/get?param1=test1&param2=test2", response.get("url").asText());
+    }
+
+    @Test
+    public void testGetBytesRequest() throws Exception {
+        HttpbinNetClient netClient = new HttpbinNetClient();
+        ByteString response = netClient.doGetBytesRequest(123);
+        assertNotNull(response);
+        assertEquals(123, response.size());
     }
 
     @Test
