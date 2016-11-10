@@ -16,7 +16,6 @@
 package com.shkil.android.util;
 
 import android.app.Service;
-import android.os.IInterface;
 import android.os.RemoteException;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -40,20 +39,17 @@ public abstract class ServiceAccessor<T> implements Releasable {
     }
 
     public void bindToService() {
-        checkConnectorAvailable();
-        serviceConnector.bindService(Service.BIND_AUTO_CREATE);
+        getServiceConnector().bindService(Service.BIND_AUTO_CREATE);
     }
 
     @NonNull
-    public synchronized T getService(boolean waitConnection) throws RemoteException {
-        checkConnectorAvailable();
-        return serviceConnector.getService(waitConnection);
+    public T getService(boolean waitConnection) throws RemoteException {
+        return getServiceConnector().getService(waitConnection);
     }
 
     @Nullable
-    public synchronized T getServiceIfReady() {
-        checkConnectorAvailable();
-        return serviceConnector.getServiceIfReady();
+    public T getServiceIfReady() {
+        return getServiceConnector().getServiceIfReady();
     }
 
     /**
@@ -61,7 +57,7 @@ public abstract class ServiceAccessor<T> implements Releasable {
      * Returns <code>null</code> if service connection is not ready and invoked on the main thread.
      */
     @Nullable
-    public synchronized T getServiceIfPossible() {
+    public T getServiceIfPossible() {
         try {
             return getService(!Utils.isRunningOnMainThread());
         } catch (RemoteException ex) {
@@ -70,9 +66,8 @@ public abstract class ServiceAccessor<T> implements Releasable {
         }
     }
 
-    public synchronized boolean isServiceReady() {
-        checkConnectorAvailable();
-        return serviceConnector.isServiceReady();
+    public boolean isServiceReady() {
+        return getServiceConnector().isServiceReady();
     }
 
     public synchronized final void release() {
@@ -84,10 +79,11 @@ public abstract class ServiceAccessor<T> implements Releasable {
 
     protected abstract void onRelease(ServiceConnector<T> serviceConnector);
 
-    private void checkConnectorAvailable() {
+    private synchronized ServiceConnector<T> getServiceConnector() {
         if (serviceConnector == null) {
             throw new IllegalStateException("Service connection was released");
         }
+        return serviceConnector;
     }
 
     @Override
