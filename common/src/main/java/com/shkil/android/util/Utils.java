@@ -542,19 +542,34 @@ public class Utils {
     }
 
     public static String toHex(byte[] data) {
-        if (data == null || data.length == 0) {
+        return toHex(data, 0);
+    }
+
+    public static String toHex(byte[] data, int startIndex) {
+        if (data == null || data.length == startIndex) {
             return "";
         }
-        StringBuilder buffer = new StringBuilder(data.length * 2);
-        toHex(data, buffer);
+
+        if (startIndex > data.length) {
+            throw new ArrayIndexOutOfBoundsException("startIndex");
+        }
+        StringBuilder buffer = new StringBuilder((data.length - startIndex) * 2);
+        toHex(data, startIndex, buffer);
         return buffer.toString();
     }
 
     public static void toHex(byte[] data, StringBuilder output) {
-        if (data == null || data.length == 0) {
+        toHex(data, 0, output);
+    }
+
+    public static void toHex(byte[] data, int startIndex, StringBuilder output) {
+        if (data == null || data.length == startIndex) {
             return;
         }
-        for (int i = 0; i < data.length; i++) {
+        if (startIndex > data.length) {
+            throw new ArrayIndexOutOfBoundsException("startIndex");
+        }
+        for (int i = startIndex; i < data.length; i++) {
             byte dataByte = data[i];
             int halfByte = (dataByte >>> 4) & 0x0F;
             int twoHalves = 0;
@@ -569,5 +584,6 @@ public class Utils {
             while (twoHalves++ < 1);
         }
     }
+
 
 }
