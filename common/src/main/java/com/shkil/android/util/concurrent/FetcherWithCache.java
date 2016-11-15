@@ -29,4 +29,6 @@ public interface FetcherWithCache<K, V> extends Fetcher<K,V> {
 
     V evict(K key);
 
+    V put(K key, V value);
+
 }

@@ -66,6 +66,13 @@ public class Result<V> {
         return value;
     }
 
+    public V getValueOrThrowRuntime() throws RuntimeException {
+        if (exception != null) {
+            throw new RuntimeException(exception);
+        }
+        return value;
+    }
+
     public Exception getException() {
         return exception;
     }

@@ -70,6 +70,26 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
+    public V awaitValue() {
+        return await().getValue();
+    }
+
+    @Override
+    public V awaitValueOrThrow() throws Exception {
+        return await().getValueOrThrow();
+    }
+
+    @Override
+    public V awaitValueOrThrowEx() throws ExecutionException {
+        return await().getValueOrThrowEx();
+    }
+
+    @Override
+    public V awaitValueOrThrowRuntime() throws RuntimeException {
+        return await().getValueOrThrowRuntime();
+    }
+
+    @Override
     public final Result<V> await(long time, TimeUnit units) throws TimeoutException {
         checkResultCallerThread();
         if (result != null) {
@@ -127,7 +147,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     protected abstract void onDone();
 
     @Override
-    public final synchronized ResultFuture<V> setResultListener(ResultListener<V> listener) {
+    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener) {
         if (this.listener != null) {
             throw new IllegalStateException("Listener was already set");
         }
@@ -153,10 +173,10 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public final synchronized ResultFuture<V> setResultListener(ResultListener<V> listener,
+    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener,
             Executor resultExecutor) {
         this.resultExecutor = resultExecutor;
-        return setResultListener(listener);
+        return onResult(listener);
     }
 
     static class OnResultRunnable<V> implements Runnable {

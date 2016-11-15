@@ -20,7 +20,6 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
-
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
 
@@ -114,7 +113,11 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
-    public QueueFetcher(Executor executor, /*@Nullable*/ Executor resultExecutor, boolean mayInterruptTask) {
+    public QueueFetcher(Executor executor, boolean mayInterruptTask) {
+        this(executor, MainThread.EXECUTOR, mayInterruptTask);
+    }
+
+    public QueueFetcher(Executor executor, @Nullable Executor resultExecutor, boolean mayInterruptTask) {
         this.executor = executor;
         this.resultExecutor = resultExecutor;
         this.mayInterruptTask = mayInterruptTask;
@@ -343,6 +346,26 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
+        public V awaitValue() {
+            return await().getValue();
+        }
+
+        @Override
+        public V awaitValueOrThrow() throws Exception {
+            return await().getValueOrThrow();
+        }
+
+        @Override
+        public V awaitValueOrThrowEx() throws ExecutionException {
+            return await().getValueOrThrowEx();
+        }
+
+        @Override
+        public V awaitValueOrThrowRuntime() throws RuntimeException {
+            return await().getValueOrThrowRuntime();
+        }
+
+        @Override
         public Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
             FetcherTask task = this.task;
             if (task != null) {
@@ -417,7 +440,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener) {
+        public ResultFuture<V> onResult(ResultListener<V> listener) {
             synchronized (this) {
                 if (this.listener != null) {
                     throw new IllegalStateException("Listener was already set");
@@ -439,10 +462,10 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener, Executor resultExecutor) {
+        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
             synchronized (this) {
                 this.resultExecutor = resultExecutor;
-                return setResultListener(listener);
+                return onResult(listener);
             }
         }
 /*

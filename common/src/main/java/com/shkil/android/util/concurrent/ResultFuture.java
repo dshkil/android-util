@@ -18,6 +18,7 @@ package com.shkil.android.util.concurrent;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -37,6 +38,14 @@ public interface ResultFuture<V> {
      */
     @Nonnull
     Result<V> await();
+
+    V awaitValue();
+
+    V awaitValueOrThrow() throws Exception;
+
+    V awaitValueOrThrowEx() throws ExecutionException;
+
+    V awaitValueOrThrowRuntime() throws RuntimeException;
 
     /**
      * Waits if necessary for at most the given time for the computation
@@ -66,8 +75,8 @@ public interface ResultFuture<V> {
 
     boolean isCancelled();
 
-    ResultFuture<V> setResultListener(ResultListener<V> listener);
+    ResultFuture<V> onResult(ResultListener<V> listener);
 
-    ResultFuture<V> setResultListener(ResultListener<V> listener, Executor resultExecutor);
+    ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor);
 
 }

@@ -18,6 +18,7 @@ package com.shkil.android.util.concurrent;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -89,6 +90,26 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
+    public V awaitValue() {
+        return await().getValue();
+    }
+
+    @Override
+    public V awaitValueOrThrow() throws Exception {
+        return await().getValueOrThrow();
+    }
+
+    @Override
+    public V awaitValueOrThrowEx() throws ExecutionException {
+        return await().getValueOrThrowEx();
+    }
+
+    @Override
+    public V awaitValueOrThrowRuntime() throws RuntimeException {
+        return await().getValueOrThrowRuntime();
+    }
+
+    @Override
     public Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
         return handleResult(sourceFuture.await(timeout, unit));
     }
@@ -104,8 +125,8 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
-    public ResultFuture<V> setResultListener(final ResultListener<V> listener) {
-        sourceFuture.setResultListener(new ResultListener<W>() {
+    public ResultFuture<V> onResult(final ResultListener<V> listener) {
+        sourceFuture.onResult(new ResultListener<W>() {
             @Override
             public void onResult(Result<W> result) {
                 listener.onResult(handleResult(result));
@@ -115,8 +136,8 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
-    public ResultFuture<V> setResultListener(final ResultListener<V> listener, Executor resultExecutor) {
-        sourceFuture.setResultListener(new ResultListener<W>() {
+    public ResultFuture<V> onResult(final ResultListener<V> listener, Executor resultExecutor) {
+        sourceFuture.onResult(new ResultListener<W>() {
             @Override
             public void onResult(Result<W> result) {
                 listener.onResult(handleResult(result));

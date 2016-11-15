@@ -20,6 +20,7 @@ import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.concurrent.AbstractResultFuture.OnResultRunnable;
 
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -91,6 +92,26 @@ public class ResultFutures {
         }
 
         @Override
+        public V awaitValue() {
+            return await().getValue();
+        }
+
+        @Override
+        public V awaitValueOrThrow() throws Exception {
+            return await().getValueOrThrow();
+        }
+
+        @Override
+        public V awaitValueOrThrowEx() throws ExecutionException {
+            return await().getValueOrThrowEx();
+        }
+
+        @Override
+        public V awaitValueOrThrowRuntime() throws RuntimeException {
+            return await().getValueOrThrowRuntime();
+        }
+
+        @Override
         public Result<V> await(long timeout, TimeUnit unit) {
             return result;
         }
@@ -111,7 +132,7 @@ public class ResultFutures {
         }
 
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener) {
+        public ResultFuture<V> onResult(ResultListener<V> listener) {
             if (resultExecutor != null) {
                 resultExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
             } else {
@@ -121,9 +142,9 @@ public class ResultFutures {
         }
 
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener, Executor resultExecutor) {
+        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
             this.resultExecutor = resultExecutor;
-            return setResultListener(listener);
+            return onResult(listener);
         }
 
     }

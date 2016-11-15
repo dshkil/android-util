@@ -27,6 +27,10 @@ public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> imp
 
     protected final Cache<? super K, V> cache;
 
+    public QueueFetcherWithCache(Executor executor, int cacheSize, boolean mayInterruptTask) {
+        this(executor, MainThread.EXECUTOR, cacheSize, mayInterruptTask);
+    }
+
     public QueueFetcherWithCache(Executor executor, Executor resultExecutor, int cacheSize, boolean mayInterruptTask) {
         this(executor, resultExecutor, QueueFetcherWithCache.<K, V>newCache(cacheSize), mayInterruptTask);
     }
@@ -62,6 +66,13 @@ public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> imp
             return ResultFutures.success(value);
         }
         return super.fetch(key, priority);
+    }
+
+    @Override
+    public V put(K key, V value) {
+        synchronized (cache.getSyncLock()) {
+            return cache.put(key, value);
+        }
     }
 
     @Override
