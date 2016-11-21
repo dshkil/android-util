@@ -6,9 +6,10 @@ import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.concurrent.TimeUnit;
+
 import static com.shkil.android.util.Utils.isNotEmpty;
 import static java.lang.System.currentTimeMillis;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class AccessToken {
 
@@ -32,11 +33,11 @@ public class AccessToken {
         return this;
     }
 
-    public AccessToken setExpiresIn(long expiresInSeconds) {
-        if (expiresInSeconds > 0) {
-            this.expiresAt = currentTimeMillis() + SECONDS.toMillis(expiresInSeconds);
+    public AccessToken setExpiresIn(long expiresIn, TimeUnit timeUnit) {
+        if (expiresIn > 0) {
+            this.expiresAt = currentTimeMillis() + timeUnit.toMillis(expiresIn);
         } else {
-            this.expiresAt = expiresInSeconds;
+            this.expiresAt = expiresIn;
         }
         return this;
     }
