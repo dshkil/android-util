@@ -51,7 +51,10 @@ public abstract class AbstractNetClient {
     protected static final String HEADER_AUTHORIZATION_FLAG = "X-NetClient-Authorization";
     protected static final String FLAG_REQUIRED = "Required";
     protected static final String FLAG_DESIRED = "Desired";
-    protected static final String HEADER_AUTHORIZATION = "Authorization";
+
+    public static final String HEADER_AUTHORIZATION = "Authorization";
+    public static final String HEADER_ACCEPT = "Accept";
+    public static final String HEADER_CONTENT_TYPE = "Content-Type";
 
     public static long EXPIRATION_ADVANCE_MILLIS = MINUTES.toMillis(3);
 
