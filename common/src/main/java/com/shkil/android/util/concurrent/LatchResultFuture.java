@@ -51,7 +51,10 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
     @Override
     protected final Result<V> fetchResult(long time, TimeUnit units) throws InterruptedException,
             TimeoutException, ExecutionException {
-        resultLatch.await(time, units);
+        boolean reached = resultLatch.await(time, units);
+        if (!reached) {
+            return Result.failure(new TimeoutException());
+        }
         if (isCancelled()) {
             return Result.interrupted(new CancellationException());
         }
