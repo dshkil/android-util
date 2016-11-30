@@ -41,6 +41,9 @@ public class MainThreadExecutor implements Executor {
         }
     }
 
+    /**
+     * Causes the runnable to be added to the message queue
+     */
     public void post(Runnable runnable) {
         MainThread.HANDLER.post(runnable);
     }

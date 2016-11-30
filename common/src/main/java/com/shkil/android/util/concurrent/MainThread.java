@@ -18,8 +18,6 @@ package com.shkil.android.util.concurrent;
 import android.os.Handler;
 import android.os.Looper;
 
-import java.util.concurrent.Executor;
-
 public final class MainThread {
 
     public static final Looper LOOPER = Looper.getMainLooper();
@@ -27,6 +25,17 @@ public final class MainThread {
     public static final MainThreadExecutor EXECUTOR = MainThreadExecutor.getInstance();
 
     private MainThread() {
+    }
+
+    public static void execute(Runnable runnable) {
+        EXECUTOR.execute(runnable);
+    }
+
+    /**
+     * Causes the runnable to be added to the message queue
+     */
+    public static void post(Runnable runnable) {
+        EXECUTOR.post(runnable);
     }
 
 }
