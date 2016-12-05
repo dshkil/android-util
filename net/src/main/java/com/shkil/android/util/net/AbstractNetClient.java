@@ -89,14 +89,14 @@ public abstract class AbstractNetClient {
         if (httpClient == null) {
             synchronized (this) {
                 if (httpClient == null) {
-                    httpClient = createHttpClient();
+                    httpClient = createHttpClientBuilder().build();
                 }
             }
         }
         return httpClient;
     }
 
-    protected OkHttpClient createHttpClient() {
+    protected OkHttpClient.Builder createHttpClientBuilder() {
         OkHttpClient.Builder httpClientBuilder = new OkHttpClient.Builder();
         if (logLevel != Level.NONE) {
             HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(logger)
@@ -106,7 +106,7 @@ public abstract class AbstractNetClient {
         if (MAX_RETRY_ATTEMPTS > 0) {
 //            httpClientBuilder.addNetworkInterceptor(new BackoffInterceptor());
         }
-        return httpClientBuilder.build();
+        return httpClientBuilder;
     }
 
     protected abstract RequestBuilder newRequestBuilder(HttpMethod method, String uri);
