@@ -15,13 +15,7 @@
  */
 package com.shkil.android.util.concurrent;
 
-import java.util.concurrent.TimeUnit;
-
 public interface FetcherWithCache<K, V> extends Fetcher<K,V> {
-
-    V getValue(K key) throws Exception;
-
-    V getValue(K key, long timeout, TimeUnit units) throws Exception;
 
     <T extends K> V getCachedValue(T key);
 

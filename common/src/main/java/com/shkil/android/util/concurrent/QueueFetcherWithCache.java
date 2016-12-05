@@ -16,16 +16,43 @@
 package com.shkil.android.util.concurrent;
 
 import com.shkil.android.util.Result;
+import com.shkil.android.util.ValueFetcher;
 import com.shkil.android.util.cache.Cache;
 import com.shkil.android.util.cache.LruCache;
 import com.shkil.android.util.cache.SingleValueCache;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 
 public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> implements FetcherWithCache<K,V> {
 
     protected final Cache<? super K, V> cache;
+
+    public static <K,V> QueueFetcherWithCache<K,V> create(Executor executor, int cacheSize, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
+        return new QueueFetcherWithCache<K,V>(executor, cacheSize, mayInterruptTask) {
+            @Override
+            protected V fetchValue(K key) throws Exception {
+                return fetcher.fetchValue(key);
+            }
+        };
+    }
+
+    public static <K,V> QueueFetcherWithCache<K,V> create(Executor executor, Executor resultExecutor, int cacheSize, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
+        return new QueueFetcherWithCache<K,V>(executor, resultExecutor, cacheSize, mayInterruptTask) {
+            @Override
+            protected V fetchValue(K key) throws Exception {
+                return fetcher.fetchValue(key);
+            }
+        };
+    }
+
+    public static <K,V> QueueFetcherWithCache<K,V> create(Executor executor, Cache<? super K, V> cache, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
+        return new QueueFetcherWithCache<K,V>(executor, cache, mayInterruptTask) {
+            @Override
+            protected V fetchValue(K key) throws Exception {
+                return fetcher.fetchValue(key);
+            }
+        };
+    }
 
     public QueueFetcherWithCache(Executor executor, int cacheSize, boolean mayInterruptTask) {
         this(executor, MainThread.EXECUTOR, cacheSize, mayInterruptTask);
@@ -33,6 +60,10 @@ public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> imp
 
     public QueueFetcherWithCache(Executor executor, Executor resultExecutor, int cacheSize, boolean mayInterruptTask) {
         this(executor, resultExecutor, QueueFetcherWithCache.<K, V>newCache(cacheSize), mayInterruptTask);
+    }
+
+    public QueueFetcherWithCache(Executor executor, Cache<? super K, V> cache, boolean mayInterruptTask) {
+        this(executor, MainThread.EXECUTOR, cache, mayInterruptTask);
     }
 
     public QueueFetcherWithCache(Executor executor, Executor resultExecutor, Cache<? super K, V> cache, boolean mayInterruptTask) {
@@ -73,30 +104,6 @@ public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> imp
         synchronized (cache.getSyncLock()) {
             return cache.put(key, value);
         }
-    }
-
-    @Override
-    public V getValue(K key) throws Exception {
-        V value;
-        synchronized (cache.getSyncLock()) {
-            value = cache.get(key);
-        }
-        if (value != null) {
-            return value;
-        }
-        return fetch(key).await().getValueOrThrow();
-    }
-
-    @Override
-    public V getValue(K key, long timeout, TimeUnit units) throws Exception {
-        V value;
-        synchronized (cache.getSyncLock()) {
-            value = cache.get(key);
-        }
-        if (value != null) {
-            return value;
-        }
-        return fetch(key).await(timeout, units).getValueOrThrow();
     }
 
     @Override

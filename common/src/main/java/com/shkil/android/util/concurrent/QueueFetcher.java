@@ -22,6 +22,7 @@ import android.util.Log;
 
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueFetcher;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -111,6 +112,24 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         public String toString() {
             return "QueueKey[key=" + key + "]";
         }
+    }
+
+    public static <K,V> QueueFetcher<K,V> create(Executor executor, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
+        return new QueueFetcher<K,V>(executor, mayInterruptTask) {
+            @Override
+            protected V fetchValue(K key) throws Exception {
+                return fetcher.fetchValue(key);
+            }
+        };
+    }
+
+    public static <K,V> QueueFetcher<K,V> create(Executor executor, @Nullable Executor resultExecutor, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
+        return new QueueFetcher<K,V>(executor, resultExecutor, mayInterruptTask) {
+            @Override
+            protected V fetchValue(K key) throws Exception {
+                return fetcher.fetchValue(key);
+            }
+        };
     }
 
     public QueueFetcher(Executor executor, boolean mayInterruptTask) {
