@@ -338,13 +338,21 @@ public abstract class AbstractNetClient {
         return new ServerMessageException(response.message(), String.valueOf(response.code()));
     }
 
+    protected Executor getSerialExecutor() {
+        return SerialExecutorLazyHolder.EXECUTOR;
+    }
+
     protected <V> ResultFuture<V> executeSerialAsync(Callable<V> task) {
-        return ResultFutures.executeTask(task, SerialExecutorLazyHolder.EXECUTOR)
+        return ResultFutures.executeTask(task, getSerialExecutor())
                 .getResultFuture(MainThreadExecutor.getInstance(), true);
     }
 
+    protected Executor getAsyncExecutor() {
+        return ThreadPoolExecutorLazyHolder.EXECUTOR;
+    }
+
     protected <V> ResultFuture<V> executeAsync(Callable<V> task) {
-        return ResultFutures.executeTask(task, ThreadPoolExecutorLazyHolder.EXECUTOR)
+        return ResultFutures.executeTask(task, getAsyncExecutor())
                 .getResultFuture(MainThreadExecutor.getInstance(), true);
     }
 

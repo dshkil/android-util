@@ -19,7 +19,7 @@ import com.shkil.android.util.Utils;
 
 public enum AccessType {
 
-    DEFAULT, CLIENT_TOKEN, USER_TOKEN;
+    DEFAULT, CLIENT_TOKEN, USER_TOKEN, CUSTOM;
 
     public static AccessType valueOf(String name, AccessType defaultValue) {
         return Utils.valueOf(name, AccessType.class, defaultValue);
