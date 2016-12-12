@@ -26,18 +26,18 @@ public class ServerMessageException extends IOException {
     private final String code;
     private final Object payload;
 
-    public ServerMessageException(String message) {
-        this(message, null);
+    public ServerMessageException(String serverMessage) {
+        this(serverMessage, null);
     }
 
-    public ServerMessageException(String message, String code) {
-        super(message);
+    public ServerMessageException(String serverMessage, String code) {
+        super(serverMessage);
         this.code = code;
         this.payload = null;
     }
 
-    public ServerMessageException(String message, String code, Object payload) {
-        super(message);
+    public ServerMessageException(String serverMessage, String code, Object payload) {
+        super(serverMessage);
         this.code = code;
         this.payload = payload;
     }
@@ -53,13 +53,22 @@ public class ServerMessageException extends IOException {
         return null;
     }
 
+    public String getServerMessage() {
+        return super.getMessage();
+    }
+
     @Override
-    public String getLocalizedMessage() {
+    public String getMessage() {
         String message = super.getMessage();
         if (isNotEmpty(message)) {
             return message + " / Code=" + code;
         }
         return "Code=" + code;
+    }
+
+    @Override
+    public String getLocalizedMessage() {
+        return super.getMessage();
     }
 
 }
