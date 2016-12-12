@@ -8,6 +8,7 @@ import org.json.JSONObject;
 
 import java.util.concurrent.TimeUnit;
 
+import static com.shkil.android.util.Utils.isEmpty;
 import static com.shkil.android.util.Utils.isNotEmpty;
 import static java.lang.System.currentTimeMillis;
 
@@ -15,17 +16,33 @@ public class AccessToken {
 
     private static final String TAG = "AccessToken";
 
+    public static final AccessToken NULL = new AccessToken(null, null);
+
     private final String type;
     private final String accessToken;
     private long expiresAt;
 
     public static AccessToken bearer(String accessToken) {
+        if (isEmpty(accessToken)) {
+            throw new IllegalArgumentException("accessToken is empty");
+        }
+        return new AccessToken("Bearer", accessToken);
+    }
+
+    public static AccessToken bearerOrNull(String accessToken) {
+        if (isEmpty(accessToken)) {
+            return NULL;
+        }
         return new AccessToken("Bearer", accessToken);
     }
 
     public AccessToken(String type, String accessToken) {
         this.type = type;
         this.accessToken = accessToken;
+    }
+
+    public AccessToken setNeverExpires() {
+        return setExpiresAt(-1);
     }
 
     public AccessToken setExpiresAt(long expiresAt) {
@@ -51,10 +68,16 @@ public class AccessToken {
     }
 
     public long getExpiresAt() {
+        if (this == NULL) {
+            return 0;
+        }
         return expiresAt;
     }
 
     public String toAuthorizationHeaderValue() {
+        if (isEmpty(type) && isEmpty(accessToken)) {
+            throw new IllegalStateException("null type and token");
+        }
         return type + " " + accessToken;
     }
 
@@ -88,6 +111,9 @@ public class AccessToken {
 
     @Override
     public String toString() {
+        if (this == NULL) {
+            return "AccessToken{NULL}";
+        }
         return "AccessToken{" +
                 "type='" + type + '\'' +
                 ", accessToken='" + accessToken + '\'' +

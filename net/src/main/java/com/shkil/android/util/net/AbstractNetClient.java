@@ -140,7 +140,11 @@ public abstract class AbstractNetClient {
     }
 
     protected boolean isTokenExpired(AccessToken accessToken) {
-        return accessToken.getExpiresAt() - EXPIRATION_ADVANCE_MILLIS <= currentTimeMillis();
+        long expiresAt = accessToken.getExpiresAt();
+        if (expiresAt >= 0) {
+            return expiresAt - EXPIRATION_ADVANCE_MILLIS <= currentTimeMillis();
+        }
+        return false;
     }
 
     protected final Response execute(Request request) throws IOException {
@@ -156,13 +160,14 @@ public abstract class AbstractNetClient {
             AccessToken accessToken = getAccessToken(accessType);
             try {
                 Request.Builder requestBuilder = request.newBuilder();
-                if (accessToken == null || isTokenExpired(accessToken)) {
+                if (accessToken == null || isTokenExpired(accessToken) || accessToken == AccessToken.NULL) {
                     accessToken = requestAccessToken(accessType);
                 }
-                if (accessToken == null) {
+                if (accessToken == null || accessToken == AccessToken.NULL) {
                     if (tokenRequired) {
                         throw new AccessTokenException("Access token is empty", AccessTokenException.CODE_INVALID);
                     }
+                    accessToken = null;
                 } else if (isTokenExpired(accessToken)) {
                     if (tokenRequired) {
                         throw new AccessTokenException("Access token is expired", AccessTokenException.CODE_EXPIRED);
