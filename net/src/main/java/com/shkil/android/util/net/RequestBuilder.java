@@ -34,6 +34,7 @@ import static com.shkil.android.util.Utils.isEmpty;
 import static com.shkil.android.util.Utils.isNotEmpty;
 import static com.shkil.android.util.net.AbstractNetClient.FLAG_DESIRED;
 import static com.shkil.android.util.net.AbstractNetClient.FLAG_REQUIRED;
+import static com.shkil.android.util.net.AbstractNetClient.HEADER_ACCEPT;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION_FLAG;
 
@@ -310,6 +311,11 @@ public class RequestBuilder {
         return this;
     }
 
+    public RequestBuilder header(String name, String value) {
+        requestBuilder.header(name, value);
+        return this;
+    }
+
     public RequestBuilder addHeader(String name, String value) {
         requestBuilder.addHeader(name, value);
         return this;
@@ -322,6 +328,16 @@ public class RequestBuilder {
 
     public RequestBuilder addHeader(String name, int value) {
         addHeader(name, String.valueOf(value));
+        return this;
+    }
+
+    public RequestBuilder removeHeader(String name) {
+        requestBuilder.removeHeader(name);
+        return this;
+    }
+
+    public RequestBuilder accept(String value) {
+        requestBuilder.header(HEADER_ACCEPT, value);
         return this;
     }
 
