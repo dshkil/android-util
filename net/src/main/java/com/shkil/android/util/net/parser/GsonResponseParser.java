@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Type;
 
+import okhttp3.ResponseBody;
+
 public class GsonResponseParser extends AbstractResponseParser {
 
     public static GsonResponseParser with(Gson gson) {
@@ -39,11 +41,14 @@ public class GsonResponseParser extends AbstractResponseParser {
     }
 
     @Override
-    protected <T> T readObject(Reader reader, Type type) throws IOException {
+    protected <T> T readObject(ResponseBody responseBody, Type type) throws IOException {
+        Reader reader = responseBody.charStream();
         try {
             return gson.fromJson(reader, type);
         } catch (RuntimeException ex) {
             throw new IOException(ex);
+        } finally {
+            reader.close();
         }
     }
 

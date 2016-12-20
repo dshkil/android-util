@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.Reader;
 import java.lang.reflect.Type;
 
+import okhttp3.ResponseBody;
+
 public class JacksonDatabindResponseParser extends AbstractResponseParser {
 
     public static ObjectMapper createObjectMapper() {
@@ -54,12 +56,15 @@ public class JacksonDatabindResponseParser extends AbstractResponseParser {
         return objectMapper;
     }
 
-    protected <T> T readObject(Reader reader, Type type) throws IOException {
+    protected <T> T readObject(ResponseBody responseBody, Type type) throws IOException {
+        Reader reader = responseBody.charStream();
         try {
             JavaType javaType = objectMapper.constructType(type);
             return objectMapper.readValue(reader, javaType);
         } catch (RuntimeException ex) {
             throw new IOException(ex);
+        } finally {
+            reader.close();
         }
     }
 

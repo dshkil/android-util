@@ -17,6 +17,7 @@ package com.shkil.android.util.net;
 
 
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import com.shkil.android.util.concurrent.MainThreadExecutor;
 import com.shkil.android.util.concurrent.ResultFuture;
@@ -29,8 +30,12 @@ import com.shkil.android.util.net.exception.UnexpectedResponseException;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
+
+import javax.annotation.concurrent.GuardedBy;
 
 import okhttp3.Call;
 import okhttp3.Headers;
@@ -49,6 +54,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 public abstract class AbstractNetClient {
 
     protected static final String HEADER_AUTHORIZATION_FLAG = "X-NetClient-Authorization";
+    protected static final String HEADER_HTTP_CLIENT_TYPE = "X-NetClient-Client-Type";
     protected static final String FLAG_REQUIRED = "Required";
     protected static final String FLAG_DESIRED = "Desired";
 
@@ -73,7 +79,9 @@ public abstract class AbstractNetClient {
         static final Executor EXECUTOR = newFixedThreadPool(4, newThreadFactory("net-client-pool-{0}"));
     }
 
-    private volatile OkHttpClient httpClient;
+    @GuardedBy("this")
+    private final Map<String,OkHttpClient> httpClients = new HashMap<>();
+
     private volatile ResponseParser responseParser;
 
     public AbstractNetClient(HttpLoggingInterceptor.Level logLevel) {
@@ -85,18 +93,16 @@ public abstract class AbstractNetClient {
         this.logger = logger;
     }
 
-    protected final OkHttpClient getHttpClient() {
+    protected synchronized final OkHttpClient getHttpClient(@Nullable String type) {
+        OkHttpClient httpClient = httpClients.get(type);
         if (httpClient == null) {
-            synchronized (this) {
-                if (httpClient == null) {
-                    httpClient = createHttpClientBuilder().build();
-                }
-            }
+            httpClient = createHttpClientBuilder(type).build();
+            httpClients.put(type, httpClient);
         }
         return httpClient;
     }
 
-    protected OkHttpClient.Builder createHttpClientBuilder() {
+    protected OkHttpClient.Builder createHttpClientBuilder(@Nullable String type) {
         OkHttpClient.Builder httpClientBuilder = new OkHttpClient.Builder();
         if (logLevel != Level.NONE) {
             HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(logger)
@@ -128,7 +134,8 @@ public abstract class AbstractNetClient {
     }
 
     protected Call newCall(Request request) {
-        return getHttpClient().newCall(request);
+        String clientType = request.header(HEADER_HTTP_CLIENT_TYPE);
+        return getHttpClient(clientType).newCall(request);
     }
 
     protected AccessToken getAccessToken(AccessType type) throws AccessTokenException {

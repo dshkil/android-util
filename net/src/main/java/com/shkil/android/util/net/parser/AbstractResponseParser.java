@@ -21,7 +21,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.lang.reflect.Type;
 
 import okhttp3.Response;
@@ -36,12 +35,7 @@ public abstract class AbstractResponseParser implements ResponseParser {
         if (object != null) {
             return object;
         }
-        Reader streamReader = responseBody.charStream();
-        try {
-            return readObject(streamReader, resultType);
-        } finally {
-            streamReader.close();
-        }
+        return readObject(responseBody, resultType);
     }
 
     protected <T> T readStandardType(ResponseBody body, Type resultType) throws IOException {
@@ -61,6 +55,6 @@ public abstract class AbstractResponseParser implements ResponseParser {
         return null;
     }
 
-    protected abstract <T> T readObject(Reader reader, Type type) throws IOException;
+    protected abstract <T> T readObject(ResponseBody responseBody, Type type) throws IOException;
 
 }

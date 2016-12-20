@@ -22,6 +22,7 @@ import java.io.Reader;
 import java.lang.reflect.Type;
 
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class SimpleResponseParser extends AbstractResponseParser {
 
@@ -45,7 +46,7 @@ public class SimpleResponseParser extends AbstractResponseParser {
     }
 
     @Override
-    protected <T> T readObject(Reader reader, Type type) throws IOException {
+    protected <T> T readObject(ResponseBody responseBody, Type type) throws IOException {
         throw new RuntimeException("Shouldn't be invoked");
     }
 

@@ -37,6 +37,7 @@ import static com.shkil.android.util.net.AbstractNetClient.FLAG_REQUIRED;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_ACCEPT;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION;
 import static com.shkil.android.util.net.AbstractNetClient.HEADER_AUTHORIZATION_FLAG;
+import static com.shkil.android.util.net.AbstractNetClient.HEADER_HTTP_CLIENT_TYPE;
 
 public class RequestBuilder {
 
@@ -346,6 +347,11 @@ public class RequestBuilder {
      */
     public RequestBuilder basicAuthentication(String username, String password) {
         requestBuilder.header(HEADER_AUTHORIZATION, Credentials.basic(username, password));
+        return this;
+    }
+
+    public RequestBuilder httpClientType(String clientType) {
+        requestBuilder.header(HEADER_HTTP_CLIENT_TYPE, clientType);
         return this;
     }
 
