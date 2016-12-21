@@ -20,9 +20,11 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.util.Log;
 
+import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueFetcher;
+import com.shkil.android.util.ValueListener;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -487,20 +489,27 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                 return onResult(listener);
             }
         }
-/*
+
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener, long time, TimeUnit units) {
-            throw new RuntimeException("Not implemented yet"); //TODO
+        public ResultFuture<V> onSuccess(ValueListener<V> listener) {
+            throw new RuntimeException("Not implemented");
         }
 
         @Override
-        public ResultFuture<V> setResultListener(ResultListener<V> listener, Executor resultExecutor, long timeout, TimeUnit units) {
-            synchronized (this) {
-                this.resultExecutor = resultExecutor;
-                return setResultListener(listener, timeout, units);
-            }
+        public ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor) {
+            throw new RuntimeException("Not implemented");
         }
-*/
+
+        @Override
+        public ResultFuture<V> onError(ExceptionListener listener) {
+            throw new RuntimeException("Not implemented");
+        }
+
+        @Override
+        public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
+            throw new RuntimeException("Not implemented");
+        }
+
         public long getPriority() {
             return priority;
         }

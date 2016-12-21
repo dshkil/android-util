@@ -15,8 +15,10 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueListener;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -78,5 +80,13 @@ public interface ResultFuture<V> {
     ResultFuture<V> onResult(ResultListener<V> listener);
 
     ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor);
+
+    ResultFuture<V> onSuccess(ValueListener<V> listener);
+
+    ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor);
+
+    ResultFuture<V> onError(ExceptionListener listener);
+
+    ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor);
 
 }

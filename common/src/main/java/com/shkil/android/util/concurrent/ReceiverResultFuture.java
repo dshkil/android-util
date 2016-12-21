@@ -19,7 +19,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.ResultReceiver;
 
-
 import com.shkil.android.util.Result;
 
 import java.util.concurrent.Executor;
@@ -73,9 +72,11 @@ public abstract class ReceiverResultFuture<V> extends LatchResultFuture<V> {
     }
 
     @Override
-    protected void onDone() {
-        super.onDone();
-        resultReceiver = null;
+    protected void onDone(boolean cancelled) {
+        super.onDone(cancelled);
+        if (cancelled) {
+            resultReceiver = null;
+        }
     }
 
     @Override

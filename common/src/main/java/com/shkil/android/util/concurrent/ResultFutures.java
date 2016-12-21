@@ -15,8 +15,10 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueListener;
 import com.shkil.android.util.concurrent.AbstractResultFuture.OnResultRunnable;
 
 import java.util.concurrent.Callable;
@@ -51,6 +53,14 @@ public class ResultFutures {
         return result(Result.<V>failure(ex), defaultResultExecutor);
     }
 
+    public static <V> ResultListener<V> successAdapter(ValueListener<V> listener) {
+        return new SuccessResultAdapter<>(listener);
+    }
+
+    public static <V> ResultListener<V> errorAdapter(ExceptionListener ex) {
+        return new ErrorResultAdapter<>(ex);
+    }
+
     public static <V> ResultFutureTask<V> futureTask(Callable<V> task) {
         return ResultFutureTask.create(task);
     }
@@ -62,7 +72,7 @@ public class ResultFutures {
     private static class ImmediateResultFuture<V> implements ResultFuture<V> {
         private final Result<V> result;
         private final AtomicBoolean cancelled = new AtomicBoolean();
-        private volatile Executor resultExecutor;
+        private volatile Executor defaultResultExecutor;
 
         public static <V> ResultFuture<V> success(V value, Executor defaultResultExecutor) {
             return create(Result.success(value), defaultResultExecutor);
@@ -78,7 +88,7 @@ public class ResultFutures {
 
         protected ImmediateResultFuture(Result<V> result, Executor defaultResultExecutor) {
             this.result = result;
-            this.resultExecutor = defaultResultExecutor;
+            this.defaultResultExecutor = defaultResultExecutor;
         }
 
         @Override
@@ -133,6 +143,11 @@ public class ResultFutures {
 
         @Override
         public ResultFuture<V> onResult(ResultListener<V> listener) {
+            return onResult(listener, defaultResultExecutor);
+        }
+
+        @Override
+        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
             if (resultExecutor != null) {
                 resultExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
             } else {
@@ -142,11 +157,55 @@ public class ResultFutures {
         }
 
         @Override
-        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
-            this.resultExecutor = resultExecutor;
-            return onResult(listener);
+        public ResultFuture<V> onSuccess(ValueListener<V> listener) {
+            return onSuccess(listener, defaultResultExecutor);
         }
 
+        @Override
+        public ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor) {
+            return onResult(ResultFutures.successAdapter(listener), resultExecutor);
+        }
+
+        @Override
+        public ResultFuture<V> onError(ExceptionListener listener) {
+            return onError(listener, defaultResultExecutor);
+        }
+
+        @Override
+        public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
+            return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
+        }
+    }
+
+    private static class SuccessResultAdapter<V> implements ResultListener<V> {
+        private final ValueListener<V> listener;
+
+        public SuccessResultAdapter(ValueListener<V> listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void onResult(Result<V> result) {
+            if (result.isSuccess()) {
+                listener.onValue(result.getValue());
+            }
+        }
+    }
+
+    private static class ErrorResultAdapter<V> implements ResultListener<V> {
+        private final ExceptionListener listener;
+
+        public ErrorResultAdapter(ExceptionListener listener) {
+            this.listener = listener;
+        }
+
+        @Override
+        public void onResult(Result<V> result) {
+            Exception ex = result.getException();
+            if (ex != null) {
+                listener.onException(ex);
+            }
+        }
     }
 
 }

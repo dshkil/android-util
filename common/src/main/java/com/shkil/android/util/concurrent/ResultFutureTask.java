@@ -72,7 +72,7 @@ public class ResultFutureTask<V> extends FutureTask<Result<V>> {
 
     protected void fireOnReady(Result<V> result) {
         for (TaskResultFuture<V> listener : getListeners()) {
-            listener.onResult(result);
+            listener.fireResult(result);
         }
     }
 
@@ -164,7 +164,7 @@ public class ResultFutureTask<V> extends FutureTask<Result<V>> {
         }
 
         @Override
-        protected void onDone() {
+        protected void onDone(boolean cancelled) {
             this.task = null; // make eligible for gc
         }
     }
