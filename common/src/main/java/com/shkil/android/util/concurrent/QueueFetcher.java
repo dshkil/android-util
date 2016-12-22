@@ -325,6 +325,32 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
+    private long findMaxPriority(List<DeferredFetchingFuture> futures) {
+        if (futures == null || futures.isEmpty()) {
+            return 0;
+        }
+        long result = 0;
+        for (DeferredFetchingFuture future : futures) {
+            long priority = future.getPriority();
+            if (priority > result) {
+                result = priority;
+            }
+        }
+        return result;
+    }
+
+    public void addListener(FetcherListener<K, V> l) {
+        synchronized (listeners) {
+            listeners.add(l);
+        }
+    }
+
+    public void removeListener(FetcherListener<K, V> l) {
+        synchronized (listeners) {
+            listeners.remove(l);
+        }
+    }
+
     private class DeferredFetchingFuture extends AbstractResultFuture<V> implements FetcherListener<K, V> {
         private volatile FetcherTask task;
         private final long priority;
@@ -395,32 +421,6 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
         public long getPriority() {
             return priority;
-        }
-    }
-
-    private long findMaxPriority(List<DeferredFetchingFuture> futures) {
-        if (futures == null || futures.isEmpty()) {
-            return 0;
-        }
-        long result = 0;
-        for (DeferredFetchingFuture future : futures) {
-            long priority = future.getPriority();
-            if (priority > result) {
-                result = priority;
-            }
-        }
-        return result;
-    }
-
-    public void addListener(FetcherListener<K, V> l) {
-        synchronized (listeners) {
-            listeners.add(l);
-        }
-    }
-
-    public void removeListener(FetcherListener<K, V> l) {
-        synchronized (listeners) {
-            listeners.remove(l);
         }
     }
 
