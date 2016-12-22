@@ -117,6 +117,10 @@ public abstract class AbstractNetClient {
 
     protected abstract RequestBuilder newRequestBuilder(HttpMethod method, String uri);
 
+    protected final RequestBuilder newRequestBuilder(HttpMethod method, String uri, Object... args) {
+        return newRequestBuilder(method, String.format(uri, args));
+    }
+
     protected final RequestBuilder newGetRequestBuilder(String uri) {
         return newRequestBuilder(HttpMethod.GET, uri);
     }
@@ -131,6 +135,22 @@ public abstract class AbstractNetClient {
 
     protected final RequestBuilder newPostRequestBuilder(String uri, Object... args) {
         return newRequestBuilder(HttpMethod.POST, String.format(uri, args));
+    }
+
+    protected final RequestBuilder newPutRequestBuilder(String uri) {
+        return newRequestBuilder(HttpMethod.PUT, uri);
+    }
+
+    protected final RequestBuilder newPutRequestBuilder(String uri, Object... args) {
+        return newRequestBuilder(HttpMethod.PUT, String.format(uri, args));
+    }
+
+    protected final RequestBuilder newPatchRequestBuilder(String uri) {
+        return newRequestBuilder(HttpMethod.PATCH, uri);
+    }
+
+    protected final RequestBuilder newPatchRequestBuilder(String uri, Object... args) {
+        return newRequestBuilder(HttpMethod.PATCH, String.format(uri, args));
     }
 
     protected Call newCall(Request request) {
