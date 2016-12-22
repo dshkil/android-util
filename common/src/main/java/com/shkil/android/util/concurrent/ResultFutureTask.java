@@ -142,11 +142,11 @@ public class ResultFutureTask<V> extends FutureTask<Result<V>> {
         }
 
         @Override
-        protected Result<V> fetchResult(long time, TimeUnit units) throws TimeoutException,
+        protected Result<V> fetchResult(long timeout, TimeUnit unit) throws TimeoutException,
                 ExecutionException, InterruptedException {
             ResultFutureTask<V> task = this.task;
             if (task != null) {
-                return task.get(time, units);
+                return task.get(timeout, unit);
             }
             throw new IllegalStateException("Should never happen");
         }

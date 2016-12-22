@@ -18,13 +18,9 @@ package com.shkil.android.util.concurrent;
 import android.annotation.TargetApi;
 import android.os.Build;
 import android.os.SystemClock;
-import android.util.Log;
 
-import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
-import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueFetcher;
-import com.shkil.android.util.ValueListener;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,25 +35,26 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
-    private static final String TAG = QueueFetcher.class.getSimpleName();
-
     public static final int RUNNING_TASKS_LIMIT = 1;
 
-    private final Executor resultExecutor;
+    private final Executor defaultResultExecutor;
     private final boolean mayInterruptTask;
 
     private final Object lock = new Object();
-    //@GuardedBy("lock")
+
+    @GuardedBy("lock")
     private final TreeMap<QueueKey<K>, FetcherTask> tasksQueue = new TreeMap<QueueKey<K>, FetcherTask>();
-    //@GuardedBy("lock")
+
+    @GuardedBy("lock")
     private final Map<K, FetcherTask> runningTasks = new HashMap<K, FetcherTask>();
-    //@GuardedBy("itself")
+
+    @GuardedBy("itself")
     private final List<FetcherListener<K, V>> listeners = new ArrayList<FetcherListener<K, V>>(5);
 
     private final Executor executor;
@@ -138,9 +135,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         this(executor, MainThread.EXECUTOR, mayInterruptTask);
     }
 
-    public QueueFetcher(Executor executor, @Nullable Executor resultExecutor, boolean mayInterruptTask) {
+    public QueueFetcher(Executor executor, @Nullable Executor defaultResultExecutor, boolean mayInterruptTask) {
         this.executor = executor;
-        this.resultExecutor = resultExecutor;
+        this.defaultResultExecutor = defaultResultExecutor;
         this.mayInterruptTask = mayInterruptTask;
     }
 
@@ -266,7 +263,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                 try {
                     result = get();
                 } catch (Exception ex) {
-                    result = Result.<V>failure(ex);
+                    result = Result.failure(ex);
                 }
             }
             fireOnReady(result);
@@ -288,30 +285,26 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             }
             K key = this.key;
             for (FetcherListener<K, V> l : listenersSnapshot) {
-                try {
-                    l.onResult(key, result);
-                } catch (RuntimeException ex) {
-                    Log.w(TAG, ex);
-                }
+                l.onResult(key, result);
             }
         }
 
-        //@GuardedBy("lock")
+        @GuardedBy("lock")
         protected void addListener(DeferredFetchingFuture listener) {
             listeners.add(listener);
         }
 
-        //@GuardedBy("lock")
+        @GuardedBy("lock")
         protected void removeListener(DeferredFetchingFuture listener) {
             listeners.remove(listener);
         }
 
-        //@GuardedBy("lock")
+        @GuardedBy("lock")
         protected List<DeferredFetchingFuture> getListeners() {
             return listeners;
         }
 
-        //@GuardedBy("lock")
+        @GuardedBy("lock")
         protected void incrementUseCount() {
             useCount++;
         }
@@ -332,76 +325,34 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
-    private class DeferredFetchingFuture implements ResultFuture<V>, FetcherListener<K, V> {
-        private final AtomicBoolean cancelled = new AtomicBoolean();
+    private class DeferredFetchingFuture extends AbstractResultFuture<V> implements FetcherListener<K, V> {
         private volatile FetcherTask task;
-        private volatile Result<V> result;
-        private ResultListener<V> listener;
-        private volatile Executor resultExecutor;
         private final long priority;
         private final boolean mayInterruptTask;
 
         public DeferredFetchingFuture(FetcherTask task, long priority, boolean mayInterruptTask) {
+            super(QueueFetcher.this.defaultResultExecutor);
             this.task = task;
             this.priority = priority;
             this.mayInterruptTask = mayInterruptTask;
-            this.resultExecutor = QueueFetcher.this.resultExecutor;
         }
 
         @Override
-        public Result<V> await() {
+        protected Result<V> fetchResult() throws ExecutionException, InterruptedException {
             FetcherTask task = this.task;
             if (task != null) {
-                try {
-                    return result = task.get();
-                }
-                catch (ExecutionException ex) {
-                    return Result.failure(ex);
-                }
-                catch (InterruptedException ex) {
-                    this.cancel();
-                    return Result.interrupted(ex);
-                }
+                return task.get();
             }
-            return result;
+            throw new IllegalStateException("Should never happen");
         }
 
         @Override
-        public V awaitValue() {
-            return await().getValue();
-        }
-
-        @Override
-        public V awaitValueOrThrow() throws Exception {
-            return await().getValueOrThrow();
-        }
-
-        @Override
-        public V awaitValueOrThrowEx() throws ExecutionException {
-            return await().getValueOrThrowEx();
-        }
-
-        @Override
-        public V awaitValueOrThrowRuntime() throws RuntimeException {
-            return await().getValueOrThrowRuntime();
-        }
-
-        @Override
-        public Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
+        protected Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException, ExecutionException {
             FetcherTask task = this.task;
             if (task != null) {
-                try {
-                    return result = task.get(timeout, unit);
-                }
-                catch (ExecutionException ex) {
-                    return Result.failure(ex);
-                }
-                catch (InterruptedException ex) {
-                    this.cancel();
-                    return Result.interrupted(ex);
-                }
+                return task.get(timeout, unit);
             }
-            return result;
+            throw new IllegalStateException("Should never happen");
         }
 
         @Override
@@ -411,10 +362,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        public boolean cancel() {
-            if (cancelled.getAndSet(true)) {
-                return true;
-            }
+        protected boolean onCancel() {
             FetcherTask task = this.task;
             if (task != null) {
                 synchronized (lock) {
@@ -435,98 +383,18 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        public boolean isCancelled() {
-            return cancelled.get();
-        }
-
-        @Override
         public void onResult(K key, Result<V> result) {
-            this.result = result;
-            synchronized (this) {
-                if (listener != null) {
-                    if (resultExecutor != null) {
-                        resultExecutor.execute(new OnResultRunnable<V>(listener, result));
-                    } else {
-                        listener.onResult(result);
-                    }
-                }
-            }
+            super.fireResult(result);
             this.task = null; // make eligible for gc
         }
 
-        @Nullable
         @Override
-        public Result<V> peekResult() {
-            return result;
-        }
-
-        @Override
-        public ResultFuture<V> onResult(ResultListener<V> listener) {
-            synchronized (this) {
-                if (this.listener != null) {
-                    throw new IllegalStateException("Listener was already set");
-                }
-                if (isCancelled()) {
-                    return this;
-                }
-                if (result != null) {
-                    if (resultExecutor != null) {
-                        resultExecutor.execute(new OnResultRunnable<V>(listener, result));
-                    } else {
-                        listener.onResult(result);
-                    }
-                } else {
-                    this.listener = listener;
-                }
-            }
-            return this;
-        }
-
-        @Override
-        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
-            synchronized (this) {
-                this.resultExecutor = resultExecutor;
-                return onResult(listener);
-            }
-        }
-
-        @Override
-        public ResultFuture<V> onSuccess(ValueListener<V> listener) {
-            throw new RuntimeException("Not implemented");
-        }
-
-        @Override
-        public ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor) {
-            throw new RuntimeException("Not implemented");
-        }
-
-        @Override
-        public ResultFuture<V> onError(ExceptionListener listener) {
-            throw new RuntimeException("Not implemented");
-        }
-
-        @Override
-        public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
-            throw new RuntimeException("Not implemented");
+        protected void onDone(boolean cancelled) {
+            this.task = null; // make eligible for gc
         }
 
         public long getPriority() {
             return priority;
-        }
-    }
-
-    private static class OnResultRunnable<V> implements Runnable {
-        private final ResultListener<V> listener;
-        private final Result<V> result;
-
-        public OnResultRunnable(ResultListener<V> listener, Result<V> result) {
-            this.listener = listener;
-            this.result = result;
-        }
-
-        @Override
-        public void run() {
-            listener.onResult(result);
         }
     }
 

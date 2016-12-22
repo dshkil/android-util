@@ -33,13 +33,13 @@ import javax.annotation.concurrent.GuardedBy;
 
 abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
-    private volatile Result<V> result;
-    private volatile Executor resultExecutor;
-
     private volatile Executor defaultResultExecutor;
+
+    private volatile Result<V> result;
 
     @GuardedBy("this")
     private ResultListener<V> listener;
+    private volatile Executor resultExecutor;
 
     @GuardedBy("this")
     private List<ListenerEntry<V>> moreListeners;
@@ -111,13 +111,13 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public final Result<V> await(long time, TimeUnit units) throws TimeoutException {
+    public final Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
         checkResultCallerThread();
         if (result != null) {
             return result;
         }
         try {
-            return result = time > 0L ? this.fetchResult(time, units) : this.fetchResult();
+            return result = timeout > 0L ? this.fetchResult(timeout, unit) : this.fetchResult();
         } catch (ExecutionException ex) {
             return result = Result.failure(ex);
         } catch (CancellationException ex) {
@@ -140,7 +140,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
     protected abstract Result<V> fetchResult() throws ExecutionException, InterruptedException;
 
-    protected abstract Result<V> fetchResult(long time, TimeUnit units) throws InterruptedException,
+    protected abstract Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException,
             TimeoutException, ExecutionException;
 
     protected final void fireResult(Result<V> result) {
