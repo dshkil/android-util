@@ -15,9 +15,13 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueListener;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -29,16 +33,31 @@ import javax.annotation.concurrent.GuardedBy;
 
 abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
+    private volatile Executor defaultResultExecutor;
+
     private volatile Result<V> result;
-    private volatile Executor resultExecutor;
 
     @GuardedBy("this")
     private ResultListener<V> listener;
+    private volatile Executor resultExecutor;
+
+    @GuardedBy("this")
+    private List<ListenerEntry<V>> moreListeners;
 
     private final AtomicBoolean cancelled = new AtomicBoolean();
 
+    private static class ListenerEntry<V> {
+        final ResultListener<V> listener;
+        final Executor resultExecutor;
+
+        public ListenerEntry(ResultListener<V> listener, Executor resultExecutor) {
+            this.listener = listener;
+            this.resultExecutor = resultExecutor;
+        }
+    }
+
     public AbstractResultFuture(Executor defaultResultExecutor) {
-        this.resultExecutor = defaultResultExecutor;
+        this.defaultResultExecutor = defaultResultExecutor;
     }
 
     @Override
@@ -53,10 +72,12 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
                 return false;
             }
             this.listener = null;
+            this.moreListeners = null;
             this.resultExecutor = null;
+            this.defaultResultExecutor = null;
         }
         boolean result = onCancel();
-        onDone();
+        onDone(result);
         return result;
     }
 
@@ -65,7 +86,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         try {
             return await(0L, null);
         } catch (TimeoutException ex) {
-            return Result.failure(ex); // actually should never happens
+            throw new RuntimeException(ex);
         }
     }
 
@@ -90,13 +111,13 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public final Result<V> await(long time, TimeUnit units) throws TimeoutException {
+    public final Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
         checkResultCallerThread();
         if (result != null) {
             return result;
         }
         try {
-            return result = time > 0L ? this.fetchResult(time, units) : this.fetchResult();
+            return result = timeout > 0L ? this.fetchResult(timeout, unit) : this.fetchResult();
         } catch (ExecutionException ex) {
             return result = Result.failure(ex);
         } catch (CancellationException ex) {
@@ -119,10 +140,10 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
     protected abstract Result<V> fetchResult() throws ExecutionException, InterruptedException;
 
-    protected abstract Result<V> fetchResult(long time, TimeUnit units) throws InterruptedException,
+    protected abstract Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException,
             TimeoutException, ExecutionException;
 
-    protected final void onResult(Result<V> result) {
+    protected final void fireResult(Result<V> result) {
         try {
             if (isCancelled()) {
                 return;
@@ -137,20 +158,32 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
                             listener.onResult(result);
                         }
                     }
+                    if (moreListeners != null) {
+                        for (ListenerEntry<V> entry : moreListeners) {
+                            Executor resultExecutor = entry.resultExecutor;
+                            if (resultExecutor != null) {
+                                resultExecutor.execute(new OnResultRunnable<>(entry.listener, result, cancelled));
+                            } else {
+                                entry.listener.onResult(result);
+                            }
+                        }
+                    }
                 }
             }
         } finally {
-            onDone();
+            onDone(false);
         }
     }
 
-    protected abstract void onDone();
+    protected abstract void onDone(boolean cancelled);
 
     @Override
-    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener) {
-        if (this.listener != null) {
-            throw new IllegalStateException("Listener was already set");
-        }
+    public final ResultFuture<V> onResult(ResultListener<V> listener) {
+        return onResult(listener, defaultResultExecutor);
+    }
+
+    @Override
+    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
         if (isCancelled()) {
             return this;
         }
@@ -166,17 +199,37 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
                     listener.onResult(result);
                 }
             }
-        } else {
+        }
+        if (this.listener == null) {
             this.listener = listener;
+            this.resultExecutor = resultExecutor;
+        } else {
+            if (moreListeners == null) {
+                moreListeners = new ArrayList<>(2);
+            }
+            moreListeners.add(new ListenerEntry<>(listener, resultExecutor));
         }
         return this;
     }
 
     @Override
-    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener,
-            Executor resultExecutor) {
-        this.resultExecutor = resultExecutor;
-        return onResult(listener);
+    public ResultFuture<V> onSuccess(ValueListener<V> listener) {
+        return onSuccess(listener, defaultResultExecutor);
+    }
+
+    @Override
+    public ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor) {
+        return onResult(ResultFutures.successAdapter(listener), resultExecutor);
+    }
+
+    @Override
+    public ResultFuture<V> onError(ExceptionListener listener) {
+        return onError(listener, defaultResultExecutor);
+    }
+
+    @Override
+    public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
+        return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
     }
 
     static class OnResultRunnable<V> implements Runnable {
