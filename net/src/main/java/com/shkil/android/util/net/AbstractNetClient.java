@@ -19,8 +19,10 @@ package com.shkil.android.util.net;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import com.shkil.android.util.concurrent.Cancellator;
 import com.shkil.android.util.concurrent.MainThreadExecutor;
 import com.shkil.android.util.concurrent.ResultFuture;
+import com.shkil.android.util.concurrent.ResultFutureAdapter;
 import com.shkil.android.util.concurrent.ResultFutures;
 import com.shkil.android.util.net.exception.AccessTokenException;
 import com.shkil.android.util.net.exception.AuthException;
@@ -28,6 +30,7 @@ import com.shkil.android.util.net.exception.ServerMessageException;
 import com.shkil.android.util.net.exception.UnexpectedResponseException;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
 import java.util.HashMap;
@@ -175,10 +178,14 @@ public abstract class AbstractNetClient {
     }
 
     protected final Response execute(Request request) throws IOException {
-        return execute(request, false);
+        return execute(request, (Cancellator) null);
     }
 
-    protected final Response execute(Request request, boolean skipResponseCheck) throws IOException {
+    protected final Response execute(Request request, Cancellator cancellator) throws IOException {
+        return execute(request, false, cancellator);
+    }
+
+    protected final Response execute(Request request, boolean skipResponseCheck, Cancellator cancellator) throws IOException {
         String authFlag = request.header(HEADER_AUTHORIZATION_FLAG);
         boolean tokenRequired = authFlag != null && authFlag.startsWith(FLAG_REQUIRED);
         boolean tokenDesired = authFlag != null && authFlag.startsWith(FLAG_DESIRED);
@@ -212,7 +219,26 @@ public abstract class AbstractNetClient {
                 }
             }
         }
-        Response response = newCall(request).execute();
+        final Call call = newCall(request);
+        if (cancellator != null) {
+            cancellator.setOnCancelListener(new Cancellator.OnCancelListener() {
+                @Override
+                public void onCancel() {
+                    call.cancel();
+                }
+            });
+        }
+        Response response;
+        try {
+            if (cancellator != null && cancellator.isCanceled()) {
+                throw new InterruptedIOException("cancelled");
+            }
+            response = call.execute();
+        } finally {
+            if (cancellator != null) {
+                cancellator.setOnCancelListener(null);
+            }
+        }
         if (skipResponseCheck) {
             return response;
         }
@@ -285,7 +311,11 @@ public abstract class AbstractNetClient {
     }
 
     protected final <T> T execute(Request request, Type resultType) throws IOException {
-        Response response = execute(request);
+        return execute(request, resultType, null);
+    }
+
+    protected final <T> T execute(Request request, Type resultType, Cancellator cancellator) throws IOException {
+        Response response = execute(request, cancellator);
         try {
             Object result = parseResponse(response, resultType);
             return onRequestResult(request, response.headers(), result, resultType);
@@ -313,7 +343,11 @@ public abstract class AbstractNetClient {
     }
 
     protected final Response execute(RequestBuilder requestBuilder) throws IOException {
-        return execute(requestBuilder.build());
+        return execute(requestBuilder, (Cancellator) null);
+    }
+
+    protected final Response execute(RequestBuilder requestBuilder, Cancellator cancellator) throws IOException {
+        return execute(requestBuilder.build(), cancellator);
     }
 
     protected final ResultFuture<Response> executeSerialAsync(RequestBuilder requestBuilder) {
@@ -325,7 +359,11 @@ public abstract class AbstractNetClient {
     }
 
     protected final <T> T execute(RequestBuilder requestBuilder, Type resultType) throws IOException {
-        return execute(requestBuilder.build(), resultType);
+        return execute(requestBuilder, resultType, null);
+    }
+
+    protected final <T> T execute(RequestBuilder requestBuilder, Type resultType, Cancellator cancellator) throws IOException {
+        return execute(requestBuilder.build(), resultType, cancellator);
     }
 
     protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, Type resultType) {
@@ -334,6 +372,34 @@ public abstract class AbstractNetClient {
 
     protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Type resultType) {
         return executeAsync(requestBuilder.build(), resultType);
+    }
+
+    protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, T successValue) {
+        return executeSerialAsync(requestBuilder.build(), successValue);
+    }
+
+    protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, T successValue) {
+        return executeAsync(requestBuilder.build(), successValue);
+    }
+
+    protected final <T> ResultFuture<T> executeAsync(Request request, final T successValue) {
+        ResultFuture<Response> future = executeAsync(request);
+        return new ResultFutureAdapter<Response,T>(future) {
+            @Override
+            protected T convertValue(Response response) throws Exception {
+                return successValue;
+            }
+        };
+    }
+
+    protected final <T> ResultFuture<T> executeSerialAsync(Request request, final T successValue) {
+        ResultFuture<Response> future = executeSerialAsync(request);
+        return new ResultFutureAdapter<Response,T>(future) {
+            @Override
+            protected T convertValue(Response response) throws Exception {
+                return successValue;
+            }
+        };
     }
 
     protected void checkResponse(Response response) throws IOException {

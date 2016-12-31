@@ -40,6 +40,10 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     @GuardedBy("this")
     private ResultListener<V> listener;
     private volatile Executor resultExecutor;
+    @GuardedBy("this")
+    private Runnable cancellationListener;
+    @GuardedBy("this")
+    private Executor cancellationListenerExecutor;
 
     @GuardedBy("this")
     private List<ListenerEntry<V>> moreListeners;
@@ -71,10 +75,19 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             if (cancelled.getAndSet(true)) {
                 return false;
             }
+            if (cancellationListener != null) {
+                if (cancellationListenerExecutor != null) {
+                    cancellationListenerExecutor.execute(cancellationListener);
+                } else {
+                    cancellationListener.run();
+                }
+            }
             this.listener = null;
             this.moreListeners = null;
             this.resultExecutor = null;
             this.defaultResultExecutor = null;
+            this.cancellationListener = null;
+            this.cancellationListenerExecutor = null;
         }
         boolean result = onCancel();
         onDone(result);
@@ -176,6 +189,29 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     protected abstract void onDone(boolean cancelled);
+
+    @Override
+    public final ResultFuture<V> onCancel(Runnable listener) {
+        return onCancel(listener, defaultResultExecutor);
+    }
+
+    @Override
+    public final synchronized ResultFuture<V> onCancel(Runnable listener, Executor resultExecutor) {
+        if (cancellationListener != null) {
+            throw new IllegalStateException("Only one cancellation listener is supported");
+        }
+        if (isCancelled()) {
+            if (resultExecutor != null) {
+                resultExecutor.execute(listener);
+            } else {
+                listener.run();
+            }
+        } else {
+            this.cancellationListener = listener;
+            this.cancellationListenerExecutor = resultExecutor;
+        }
+        return this;
+    }
 
     @Override
     public final ResultFuture<V> onResult(ResultListener<V> listener) {

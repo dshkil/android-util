@@ -127,6 +127,18 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
+    public ResultFuture<V> onCancel(Runnable listener) {
+        sourceFuture.onCancel(listener);
+        return this;
+    }
+
+    @Override
+    public ResultFuture<V> onCancel(Runnable listener, Executor listenerExecutor) {
+        sourceFuture.onCancel(listener, listenerExecutor);
+        return this;
+    }
+
+    @Override
     public ResultFuture<V> onResult(final ResultListener<V> listener) {
         sourceFuture.onResult(new ResultListener<W>() {
             @Override

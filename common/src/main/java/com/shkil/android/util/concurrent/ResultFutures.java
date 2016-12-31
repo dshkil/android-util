@@ -27,6 +27,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.concurrent.GuardedBy;
+
 public class ResultFutures {
 
     public static <V> ResultFuture<V> result(Result<V> result) {
@@ -73,6 +75,11 @@ public class ResultFutures {
         private final Result<V> result;
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private volatile Executor defaultResultExecutor;
+        @GuardedBy("this")
+        private volatile Runnable cancellationListener;
+        @GuardedBy("this")
+        private volatile Executor cancellationListenerExecutor;
+
 
         public static <V> ResultFuture<V> success(V value, Executor defaultResultExecutor) {
             return create(Result.success(value), defaultResultExecutor);
@@ -93,7 +100,7 @@ public class ResultFutures {
 
         @Override
         public boolean isResultReady() {
-            return true;
+            return !isCancelled();
         }
 
         @Override
@@ -133,7 +140,21 @@ public class ResultFutures {
 
         @Override
         public boolean cancel() {
-            return cancelled.compareAndSet(false, true);
+            if (cancelled.getAndSet(true)) {
+                return false;
+            }
+            synchronized (this) {
+                if (cancellationListener != null) {
+                    if (cancellationListenerExecutor != null) {
+                        cancellationListenerExecutor.execute(cancellationListener);
+                    } else {
+                        cancellationListener.run();
+                    }
+                }
+                this.cancellationListener = null;
+                this.cancellationListenerExecutor = null;
+            }
+            return true;
         }
 
         @Override
@@ -142,15 +163,39 @@ public class ResultFutures {
         }
 
         @Override
+        public ResultFuture<V> onCancel(Runnable listener) {
+            return onCancel(listener, defaultResultExecutor);
+        }
+
+        @Override
         public ResultFuture<V> onResult(ResultListener<V> listener) {
             return onResult(listener, defaultResultExecutor);
         }
 
         @Override
-        public ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
-            if (resultExecutor != null) {
-                resultExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
+        public synchronized ResultFuture<V> onCancel(Runnable listener, Executor listenerExecutor) {
+            if (cancellationListener != null) {
+                throw new IllegalStateException("Only one cancellation listener is supported");
+            }
+            if (isCancelled()) {
+                if (listenerExecutor != null) {
+                    listenerExecutor.execute(listener);
+                } else if (isResultReady()) {
+                    listener.run();
+                }
             } else {
+                this.cancellationListener = listener;
+                this.cancellationListenerExecutor = listenerExecutor;
+            }
+            return this;
+
+        }
+
+        @Override
+        public ResultFuture<V> onResult(ResultListener<V> listener, Executor listenerExecutor) {
+            if (listenerExecutor != null) {
+                listenerExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
+            } else if (isResultReady()) {
                 listener.onResult(result);
             }
             return this;

@@ -77,16 +77,20 @@ public interface ResultFuture<V> {
 
     boolean isCancelled();
 
+    ResultFuture<V> onCancel(Runnable listener);
+
+    ResultFuture<V> onCancel(Runnable listener, Executor listenerExecutor);
+
     ResultFuture<V> onResult(ResultListener<V> listener);
 
-    ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor);
+    ResultFuture<V> onResult(ResultListener<V> listener, Executor listenerExecutor);
 
     ResultFuture<V> onSuccess(ValueListener<V> listener);
 
-    ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor);
+    ResultFuture<V> onSuccess(ValueListener<V> listener, Executor listenerExecutor);
 
     ResultFuture<V> onError(ExceptionListener listener);
 
-    ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor);
+    ResultFuture<V> onError(ExceptionListener listener, Executor listenerExecutor);
 
 }
