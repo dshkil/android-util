@@ -21,6 +21,7 @@ import android.os.SystemClock;
 
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ValueFetcher;
+import com.shkil.android.util.cache.Cache;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,7 +56,10 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     private final Map<K, FetcherTask> runningTasks = new HashMap<K, FetcherTask>();
 
     @GuardedBy("itself")
-    private final List<FetcherListener<K, V>> listeners = new ArrayList<FetcherListener<K, V>>(5);
+    private final List<FetcherListener<K, V>> listeners = new ArrayList<>(5);
+
+    @GuardedBy("lock")
+    private volatile Cache<K, V> cache;
 
     private final Executor executor;
 
@@ -141,6 +145,17 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         this.mayInterruptTask = mayInterruptTask;
     }
 
+    public QueueFetcher<K, V> setCache(Cache<K, V> cache) {
+        synchronized (lock) {
+            this.cache = cache;
+        }
+        return this;
+    }
+
+    public Cache<K, V> getCache() {
+        return cache;
+    }
+
     public Priority getDefaultPriority() {
         return defaultPriority;
     }
@@ -155,7 +170,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     }
 
     @Override
-    public ResultFuture<V> fetch(K key, /*@Nullable*/ Priority priority) {
+    public ResultFuture<V> fetch(K key, @Nullable Priority priority) {
         if (priority == null) {
             priority = defaultPriority;
         }
@@ -163,6 +178,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         ResultFuture<V> future;
         boolean forceExecute = (priority == Priority.IMMEDIATE);
         synchronized (lock) {
+            if (cache != null) {
+                V value = cache.get(key);
+                if (value != null) {
+                    return ResultFutures.success(value);
+                }
+            }
             long priorityOrdinal = priority.toLong(SystemClock.uptimeMillis());
             task = runningTasks.get(key);
             if (task == null) {
@@ -242,7 +263,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                     try {
                         result = Result.success(fetchValue(key));
                     } catch (Exception ex) {
-                        result = Result.<V>failure(ex);
+                        result = Result.failure(ex);
                     } finally {
                         synchronized (lock) {
                             runningTasks.remove(key);
@@ -275,6 +296,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             FetcherListener<K, V>[] listenersSnapshot;
             List<FetcherListener<K, V>> globalListeners = QueueFetcher.this.listeners;
             synchronized (lock) {
+                if (cache != null) {
+                    cache.put(key, result.getValue());
+                }
                 synchronized (globalListeners) {
                     int listenersCount = listeners.size();
                     listenersSnapshot = listeners.toArray(new FetcherListener[listenersCount + globalListeners.size()]);

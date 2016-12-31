@@ -15,13 +15,14 @@
  */
 package com.shkil.android.util.concurrent;
 
+@Deprecated
 public interface FetcherWithCache<K, V> extends Fetcher<K,V> {
 
     <T extends K> V getCachedValue(T key);
 
     void clear();
 
-    V evict(K key);
+    V remove(K key);
 
     V put(K key, V value);
 

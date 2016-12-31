@@ -23,6 +23,9 @@ import com.shkil.android.util.cache.SingleValueCache;
 
 import java.util.concurrent.Executor;
 
+/**
+ * @deprecated Use QueueFetcher.setCache() instead
+ */
 public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> implements FetcherWithCache<K,V> {
 
     protected final Cache<? super K, V> cache;
@@ -121,7 +124,7 @@ public abstract class QueueFetcherWithCache<K, V> extends QueueFetcher<K, V> imp
     }
 
     @Override
-    public V evict(K key) {
+    public V remove(K key) {
         synchronized (cache.getSyncLock()) {
             return cache.remove(key);
         }
