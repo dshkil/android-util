@@ -59,7 +59,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     private final List<FetcherListener<K, V>> listeners = new ArrayList<>(5);
 
     @GuardedBy("lock")
-    private volatile Cache<K, V> cache;
+    private volatile Cache<K, Result<V>> cache;
 
     private final Executor executor;
 
@@ -145,14 +145,14 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         this.mayInterruptTask = mayInterruptTask;
     }
 
-    public QueueFetcher<K, V> setCache(Cache<K, V> cache) {
+    public QueueFetcher<K, V> setCache(Cache<K, Result<V>> cache) {
         synchronized (lock) {
             this.cache = cache;
         }
         return this;
     }
 
-    public Cache<K, V> getCache() {
+    public Cache<K, Result<V>> getCache() {
         return cache;
     }
 
@@ -179,9 +179,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         boolean forceExecute = (priority == Priority.IMMEDIATE);
         synchronized (lock) {
             if (cache != null) {
-                V value = cache.get(key);
+                Result<V> value = cache.get(key);
                 if (value != null) {
-                    return ResultFutures.success(value);
+                    return ResultFutures.result(value);
                 }
             }
             long priorityOrdinal = priority.toLong(SystemClock.uptimeMillis());
@@ -250,6 +250,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
     protected abstract V fetchValue(K key) throws Exception;
 
+    protected void putResultToCache(K key, Result<V> result) {
+        if (result.isSuccess()) {
+            cache.put(key, result);
+        }
+    }
+
     private class FetcherTask extends FutureTask<Result<V>> {
         private final K key;
         private final List<DeferredFetchingFuture> listeners = new ArrayList<DeferredFetchingFuture>(4);
@@ -297,7 +303,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             List<FetcherListener<K, V>> globalListeners = QueueFetcher.this.listeners;
             synchronized (lock) {
                 if (cache != null) {
-                    cache.put(key, result.getValue());
+                    putResultToCache(key, result);
                 }
                 synchronized (globalListeners) {
                     int listenersCount = listeners.size();
