@@ -20,32 +20,43 @@ import java.util.concurrent.ExecutionException;
 
 public class Result<V> {
 
+    public enum Status {
+        COMPLETED, INTERMEDIATE, INTERRUPTED
+    }
+
     private final V value;
     private final Exception exception;
-    private final boolean interrupted;
+    private final Status status;
 
     public static <V> Result<V> success(V value) {
-        return new Result<V>(value);
+        return new Result<>(value, Status.COMPLETED);
+    }
+
+    public static <V> Result<V> intermediate(V value) {
+        return new Result<>(value, Status.INTERMEDIATE);
     }
 
     public static <V> Result<V> failure(Exception ex) {
-        return new Result<V>(ex, ex instanceof InterruptedException || ex instanceof InterruptedIOException);
+        if (ex instanceof InterruptedException || ex instanceof InterruptedIOException) {
+            return interrupted(ex);
+        }
+        return new Result<>(ex, Status.COMPLETED);
     }
 
     public static <V> Result<V> interrupted(Exception ex) {
-        return new Result<V>(ex, true);
+        return new Result<>(ex, Status.INTERRUPTED);
     }
 
-    protected Result(V value) {
+    protected Result(V value, Status status) {
         this.value = value;
         this.exception = null;
-        this.interrupted = false;
+        this.status = status;
     }
 
-    protected Result(Exception exception, boolean interrupted) {
+    protected Result(Exception exception, Status status) {
         this.value = null;
         this.exception = exception;
-        this.interrupted = interrupted;
+        this.status = status;
     }
 
     public V getValue() {
@@ -85,13 +96,28 @@ public class Result<V> {
         return exception != null;
     }
 
+    public Status getStatus() {
+        return status;
+    }
+
+    /**
+     * @return true when result is not intermediate
+     */
+    public boolean isCompleted() {
+        return status != Status.INTERMEDIATE;
+    }
+
+    public boolean isIntermediate() {
+        return status == Status.INTERMEDIATE;
+    }
+
     public boolean isInterrupted() {
-        return interrupted;
+        return status == Status.INTERRUPTED;
     }
 
     @Override
     public String toString() {
-        return "Result[value=" + value + ",exception=" + exception + ",interrupted=" + interrupted + "]";
+        return "Result[value=" + value + ",exception=" + exception + ",status=" + status + "]";
     }
 
 }

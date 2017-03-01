@@ -15,6 +15,8 @@
  */
 package com.shkil.android.util.concurrent;
 
+import android.support.annotation.NonNull;
+
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
@@ -90,7 +92,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             this.cancellationListenerExecutor = null;
         }
         boolean result = onCancel();
-        onDone(result);
+        onCompleted(result);
         return result;
     }
 
@@ -156,7 +158,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     protected abstract Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException,
             TimeoutException, ExecutionException;
 
-    protected final void fireResult(Result<V> result) {
+    protected final void fireResult(@NonNull Result<V> result) {
         try {
             if (isCancelled()) {
                 return;
@@ -184,11 +186,13 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
                 }
             }
         } finally {
-            onDone(false);
+            if (result.isCompleted()) {
+                onCompleted(false);
+            }
         }
     }
 
-    protected abstract void onDone(boolean cancelled);
+    protected abstract void onCompleted(boolean cancelled);
 
     @Override
     public final ResultFuture<V> onCancel(Runnable listener) {

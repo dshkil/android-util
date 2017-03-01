@@ -72,8 +72,8 @@ public abstract class ReceiverResultFuture<V> extends LatchResultFuture<V> {
     }
 
     @Override
-    protected void onDone(boolean cancelled) {
-        super.onDone(cancelled);
+    protected void onCompleted(boolean cancelled) {
+        super.onCompleted(cancelled);
         if (cancelled) {
             resultReceiver = null;
         }

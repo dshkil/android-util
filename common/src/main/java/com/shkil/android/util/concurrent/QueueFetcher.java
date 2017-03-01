@@ -445,7 +445,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        protected void onDone(boolean cancelled) {
+        protected void onCompleted(boolean cancelled) {
             this.task = null; // make eligible for gc
         }
 

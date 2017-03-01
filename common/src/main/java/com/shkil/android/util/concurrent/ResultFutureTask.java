@@ -164,7 +164,7 @@ public class ResultFutureTask<V> extends FutureTask<Result<V>> {
         }
 
         @Override
-        protected void onDone(boolean cancelled) {
+        protected void onCompleted(boolean cancelled) {
             this.task = null; // make eligible for gc
         }
     }

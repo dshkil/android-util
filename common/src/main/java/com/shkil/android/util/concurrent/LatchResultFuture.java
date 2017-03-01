@@ -38,8 +38,14 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
     }
 
     public final void setResult(Result<V> result) {
+        setResult(result, false);
+    }
+
+    public final void setResult(Result<V> result, boolean forceReleaseLatch) {
         fireResult(result);
-        resultLatch.countDown();
+        if (result.isCompleted() || forceReleaseLatch) {
+            resultLatch.countDown();
+        }
     }
 
     @Override
@@ -75,7 +81,7 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
     }
 
     @Override
-    protected void onDone(boolean cancelled) {
+    protected void onCompleted(boolean cancelled) {
     }
 
 }
