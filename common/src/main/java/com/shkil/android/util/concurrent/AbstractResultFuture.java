@@ -223,19 +223,18 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public final synchronized ResultFuture<V> onCancel(Runnable listener, Executor resultExecutor) {
+    public final synchronized ResultFuture<V> onCancel(Runnable listener, Executor listenerExecutor) {
         if (cancellationListener != null) {
             throw new IllegalStateException("Only one cancellation listener is supported");
         }
+        this.cancellationListener = listener;
+        this.cancellationListenerExecutor = listenerExecutor;
         if (isCancelled()) {
             if (resultExecutor != null) {
                 resultExecutor.execute(listener);
             } else {
                 listener.run();
             }
-        } else {
-            this.cancellationListener = listener;
-            this.cancellationListenerExecutor = resultExecutor;
         }
         return this;
     }
@@ -250,9 +249,11 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         if (completionListener != null) {
             throw new IllegalStateException("Only one completion listener is supported");
         }
+        this.completionListener = listener;
+        this.completionListenerExecutor = listenerExecutor;
         if (isCancelled() || isResultReady()) {
-            if (completionListenerExecutor != null) {
-                completionListenerExecutor.execute(new Runnable() {
+            if (listenerExecutor != null) {
+                listenerExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
                         listener.onCompleted(isCancelled());
@@ -261,9 +262,6 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             } else {
                 listener.onCompleted(isCancelled());
             }
-        } else {
-            this.completionListener = listener;
-            this.completionListenerExecutor = resultExecutor;
         }
         return this;
     }
