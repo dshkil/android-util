@@ -133,15 +133,16 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     @Override
     public final Result<V> await(long timeout, TimeUnit unit) throws TimeoutException {
         checkResultCallerThread();
-        if (result != null) {
+        Result<V> result = peekResult();
+        if (isCompleted(result)) {
             return result;
         }
         try {
-            return result = timeout > 0L ? this.fetchResult(timeout, unit) : this.fetchResult();
+            return this.result = timeout > 0L ? this.fetchResult(timeout, unit) : this.fetchResult();
         } catch (ExecutionException ex) {
-            return result = Result.failure(ex);
+            return this.result = Result.failure(ex);
         } catch (CancellationException ex) {
-            return result = Result.interrupted(ex);
+            return this.result = Result.interrupted(ex);
         } catch (InterruptedException ex) {
             return Result.interrupted(ex);
         }
@@ -251,7 +252,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         }
         this.completionListener = listener;
         this.completionListenerExecutor = listenerExecutor;
-        if (isCancelled() || isResultReady()) {
+        if (isCancelled() || isCompleted(peekResult())) {
             if (listenerExecutor != null) {
                 listenerExecutor.execute(new Runnable() {
                     @Override
@@ -264,6 +265,10 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             }
         }
         return this;
+    }
+
+    static boolean isCompleted(Result<?> result) {
+        return result != null && result.isCompleted();
     }
 
     @Override

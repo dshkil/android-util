@@ -38,14 +38,7 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
     }
 
     public final void setResult(Result<V> result) {
-        setResult(result, false);
-    }
-
-    public final void setResult(Result<V> result, boolean forceReleaseLatch) {
         fireResult(result);
-        if (result.isCompleted() || forceReleaseLatch) {
-            resultLatch.countDown();
-        }
     }
 
     @Override
@@ -73,15 +66,22 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
 
     @Override
     protected boolean onCancel() {
-        if (resultLatch.getCount() == 0) {
+        if (resultLatch.getCount() <= 0) {
             return false;
         }
-        resultLatch.countDown();
         return true;
     }
 
     @Override
     protected void onCompleted(boolean cancelled) {
+        resultLatch.countDown();
     }
 
+    @Override
+    public String toString() {
+        return "LatchResultFuture{" +
+                "latchCount=" + resultLatch.getCount() +
+                ", peek=" + peekResult() +
+                '}';
+    }
 }
