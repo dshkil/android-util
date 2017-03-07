@@ -15,6 +15,7 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
@@ -173,6 +174,11 @@ public class ResultFutures {
         }
 
         @Override
+        public ResultFuture<V> onCompleted(CompletionListener listener) {
+            return onCompleted(listener, defaultResultExecutor);
+        }
+
+        @Override
         public synchronized ResultFuture<V> onCancel(Runnable listener, Executor listenerExecutor) {
             if (cancellationListener != null) {
                 throw new IllegalStateException("Only one cancellation listener is supported");
@@ -197,6 +203,21 @@ public class ResultFutures {
                 listenerExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
             } else if (isResultReady()) {
                 listener.onResult(result);
+            }
+            return this;
+        }
+
+        @Override
+        public ResultFuture<V> onCompleted(final CompletionListener listener, Executor listenerExecutor) {
+            if (listenerExecutor != null) {
+                listenerExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listener.onCompleted(false);
+                    }
+                });
+            } else if (isResultReady()) {
+                listener.onCompleted(false);
             }
             return this;
         }

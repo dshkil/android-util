@@ -15,6 +15,7 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
@@ -176,5 +177,17 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     @Override
     public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
         return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
+    }
+
+    @Override
+    public ResultFuture<V> onCompleted(CompletionListener listener) {
+        sourceFuture.onCompleted(listener);
+        return this;
+    }
+
+    @Override
+    public ResultFuture<V> onCompleted(CompletionListener listener, Executor resultExecutor) {
+        sourceFuture.onCompleted(listener, resultExecutor);
+        return this;
     }
 }

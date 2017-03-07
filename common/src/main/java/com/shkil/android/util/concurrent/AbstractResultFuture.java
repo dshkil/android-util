@@ -17,6 +17,7 @@ package com.shkil.android.util.concurrent;
 
 import android.support.annotation.NonNull;
 
+import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
@@ -46,6 +47,10 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     private Runnable cancellationListener;
     @GuardedBy("this")
     private Executor cancellationListenerExecutor;
+    @GuardedBy("this")
+    private CompletionListener completionListener;
+    @GuardedBy("this")
+    private Executor completionListenerExecutor;
 
     @GuardedBy("this")
     private List<ListenerEntry<V>> moreListeners;
@@ -92,7 +97,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             this.cancellationListenerExecutor = null;
         }
         boolean result = onCancel();
-        onCompleted(result);
+        fireCompleted(result);
         return result;
     }
 
@@ -187,7 +192,25 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             }
         } finally {
             if (result.isCompleted()) {
-                onCompleted(false);
+                fireCompleted(false);
+            }
+        }
+    }
+
+    private final void fireCompleted(final boolean cancelled) {
+        onCompleted(cancelled);
+        synchronized (this) {
+            if (completionListener != null) {
+                if (completionListenerExecutor != null) {
+                    completionListenerExecutor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            completionListener.onCompleted(cancelled);
+                        }
+                    });
+                } else {
+                    completionListener.onCompleted(cancelled);
+                }
             }
         }
     }
@@ -213,6 +236,34 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         } else {
             this.cancellationListener = listener;
             this.cancellationListenerExecutor = resultExecutor;
+        }
+        return this;
+    }
+
+    @Override
+    public final ResultFuture<V> onCompleted(CompletionListener listener) {
+        return onCompleted(listener, defaultResultExecutor);
+    }
+
+    @Override
+    public final synchronized ResultFuture<V> onCompleted(final CompletionListener listener, Executor listenerExecutor) {
+        if (completionListener != null) {
+            throw new IllegalStateException("Only one completion listener is supported");
+        }
+        if (isCancelled() || isResultReady()) {
+            if (completionListenerExecutor != null) {
+                completionListenerExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        listener.onCompleted(isCancelled());
+                    }
+                });
+            } else {
+                listener.onCompleted(isCancelled());
+            }
+        } else {
+            this.completionListener = listener;
+            this.completionListenerExecutor = resultExecutor;
         }
         return this;
     }
