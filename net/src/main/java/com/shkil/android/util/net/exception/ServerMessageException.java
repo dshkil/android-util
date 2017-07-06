@@ -30,10 +30,18 @@ public class ServerMessageException extends IOException {
         this(serverMessage, null);
     }
 
+    public ServerMessageException(String serverMessage, long code) {
+        this(serverMessage, String.valueOf(code));
+    }
+
     public ServerMessageException(String serverMessage, String code) {
         super(serverMessage);
         this.code = code;
         this.payload = null;
+    }
+
+    public ServerMessageException(String serverMessage, long code, Object payload) {
+        this(serverMessage, String.valueOf(code), payload);
     }
 
     public ServerMessageException(String serverMessage, String code, Object payload) {
