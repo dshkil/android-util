@@ -41,6 +41,22 @@ public class LatchResultFuture<V> extends AbstractResultFuture<V> {
         fireResult(result);
     }
 
+    public final void setSuccess(V value) {
+        fireResult(Result.success(value));
+    }
+
+    public final void setIntermediate(V value) {
+        fireResult(Result.intermediate(value));
+    }
+
+    public final void setFailure(Exception ex) {
+        fireResult(Result.<V>failure(ex));
+    }
+
+    public final void setInterrupted(Exception ex) {
+        fireResult(Result.<V>interrupted(ex));
+    }
+
     @Override
     protected final Result<V> fetchResult() throws ExecutionException, InterruptedException {
         resultLatch.await();
