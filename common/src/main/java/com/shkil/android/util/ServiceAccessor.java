@@ -22,6 +22,14 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.shkil.android.util.common.BuildConfig;
+import com.shkil.android.util.concurrent.MainThread;
+import com.shkil.android.util.concurrent.ResultFuture;
+import com.shkil.android.util.concurrent.ResultFutures;
+
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+
+import static android.os.AsyncTask.THREAD_POOL_EXECUTOR;
 
 public abstract class ServiceAccessor<T> implements Releasable {
 
@@ -64,6 +72,78 @@ public abstract class ServiceAccessor<T> implements Releasable {
             Log.w(TAG, ex);
             return null;
         }
+    }
+
+    @NonNull
+    public T getServiceOrThrowRuntime() {
+        T service = getServiceIfPossible();
+        if (service != null) {
+            return service;
+        }
+        try {
+            return getServiceConnector().getService(true);
+        } catch (RemoteException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    public interface OnServiceReadyCallback<T> {
+        void onServiceReady(T service);
+    }
+
+    public void getServiceAsync(final OnServiceReadyCallback<T> callback) {
+        getServiceAsync(callback, MainThread.EXECUTOR);
+    }
+
+    public void getServiceAsync(final OnServiceReadyCallback<T> callback, final Executor callbackExecutor) {
+        final T service = getServiceIfPossible();
+        if (service != null) {
+            if (callbackExecutor == null) {
+                callback.onServiceReady(service);
+            } else {
+                callbackExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        callback.onServiceReady(service);
+                    }
+                });
+            }
+        } else {
+            THREAD_POOL_EXECUTOR.execute(new Runnable() {
+                @Override
+                public void run() {
+                    final T service;
+                    try {
+                        service = getService(true);
+                    } catch (RemoteException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    if (callbackExecutor == null) {
+                        callback.onServiceReady(service);
+                    } else {
+                        callbackExecutor.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.onServiceReady(service);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    public ResultFuture<T> getServiceAsync() {
+        T service = getServiceIfPossible();
+        if (service != null) {
+            return ResultFutures.success(service);
+        }
+        return ResultFutures.executeTask(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                return getService(true);
+            }
+        }, THREAD_POOL_EXECUTOR).getResultFuture(MainThread.EXECUTOR, false);
     }
 
     public boolean isServiceReady() {

@@ -15,6 +15,7 @@
  */
 package com.shkil.android.util.concurrent;
 
+import com.shkil.android.util.Cancellable;
 import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
@@ -29,7 +30,7 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public interface ResultFuture<V> {
+public interface ResultFuture<V> extends Cancellable {
 
     boolean isResultReady();
 
