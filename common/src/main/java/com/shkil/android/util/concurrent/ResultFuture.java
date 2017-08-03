@@ -56,11 +56,11 @@ public interface ResultFuture<V> extends Cancellable {
      * to complete, and then retrieves its result, if available.
      *
      * @param timeout the maximum time to wait
-     * @param unit the time unit of the timeout argument
+     * @param unit    the time unit of the timeout argument
      * @return the result
      * @throws InterruptedException if the current thread was interrupted
-     * while waiting
-     * @throws TimeoutException if the wait timed out
+     *                              while waiting
+     * @throws TimeoutException     if the wait timed out
      */
     @Nonnull
     Result<V> await(long timeout, TimeUnit unit) throws TimeoutException;
@@ -70,6 +70,21 @@ public interface ResultFuture<V> extends Cancellable {
      */
     @Nullable
     Result<V> peekResult();
+
+    /**
+     * Immediately returns value, if available, or null
+     */
+    @Nullable
+    V peekValue();
+
+    @Nullable
+    V peekValueOrThrow() throws Exception;
+
+    @Nullable
+    V peekValueOrThrowEx() throws ExecutionException;
+
+    @Nullable
+    V peekValueOrThrowRuntime() throws RuntimeException;
 
     /**
      * @return false if the task could not be cancelled, typically because it has already completed

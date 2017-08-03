@@ -140,6 +140,26 @@ public class ResultFutures {
         }
 
         @Override
+        public V peekValue() {
+            return result != null ? result.getValue() : null;
+        }
+
+        @Override
+        public V peekValueOrThrow() throws Exception {
+            return result != null ? result.getValueOrThrow() : null;
+        }
+
+        @Override
+        public V peekValueOrThrowEx() throws ExecutionException {
+            return result != null ? result.getValueOrThrowEx() : null;
+        }
+
+        @Override
+        public V peekValueOrThrowRuntime() throws RuntimeException {
+            return result != null ? result.getValueOrThrowRuntime() : null;
+        }
+
+        @Override
         public boolean cancel() {
             if (cancelled.getAndSet(true)) {
                 return false;

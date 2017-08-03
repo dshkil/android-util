@@ -32,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 abstract class AbstractResultFuture<V> implements ResultFuture<V> {
@@ -151,6 +152,26 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     @Override
     public final Result<V> peekResult() {
         return result;
+    }
+
+    @Override
+    public V peekValue() {
+        return result != null ? result.getValue() : null;
+    }
+
+    @Override
+    public V peekValueOrThrow() throws Exception {
+        return result != null ? result.getValueOrThrow() : null;
+    }
+
+    @Override
+    public V peekValueOrThrowEx() throws ExecutionException {
+        return result != null ? result.getValueOrThrowEx() : null;
+    }
+
+    @Override
+    public V peekValueOrThrowRuntime() throws RuntimeException {
+        return result != null ? result.getValueOrThrowRuntime() : null;
     }
 
     /**

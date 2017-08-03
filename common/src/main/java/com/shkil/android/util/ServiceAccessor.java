@@ -46,8 +46,9 @@ public abstract class ServiceAccessor<T> implements Releasable {
         this.serviceConnector = serviceConnector;
     }
 
-    public void bindToService() {
+    public ServiceAccessor<T> bindService() {
         getServiceConnector().bindService(Service.BIND_AUTO_CREATE);
+        return this;
     }
 
     @NonNull

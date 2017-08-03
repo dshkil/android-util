@@ -62,8 +62,7 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
             try {
                 V value = convertValue(result.getValue());
                 return convertedResult = Result.success(value);
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 return Result.failure(ex);
             }
         }
@@ -85,6 +84,34 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     @Override
     public Result<V> peekResult() {
         return handleResult(sourceFuture.peekResult());
+    }
+
+    @Nullable
+    @Override
+    public V peekValue() {
+        Result<V> result = peekResult();
+        return result != null ? result.getValue() : null;
+    }
+
+    @Nullable
+    @Override
+    public V peekValueOrThrow() throws Exception {
+        Result<V> result = peekResult();
+        return result != null ? result.getValueOrThrow() : null;
+    }
+
+    @Nullable
+    @Override
+    public V peekValueOrThrowEx() throws ExecutionException {
+        Result<V> result = peekResult();
+        return result != null ? result.getValueOrThrowEx() : null;
+    }
+
+    @Nullable
+    @Override
+    public V peekValueOrThrowRuntime() throws RuntimeException {
+        Result<V> result = peekResult();
+        return result != null ? result.getValueOrThrowRuntime() : null;
     }
 
     @Override
