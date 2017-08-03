@@ -58,6 +58,7 @@ public class ServiceConnector<T> {
     private final Context context;
     private final Intent serviceIntent;
     private final Class<T> interfaceClass;
+    private ServiceConnection serviceConnection;
     private volatile T serviceInterface;
 
     private final Object connectionLock = new Object();
@@ -83,19 +84,36 @@ public class ServiceConnector<T> {
         if (serviceReady) {
             return;
         }
-        if (context.bindService(serviceIntent, serviceConnection, flags)) {
-            Log.v(TAG, "bindService(): service binding successful");
-            return;
+        ServiceConnection newServiceConnection = null;
+        synchronized (this) {
+            if (this.serviceConnection == null) {
+                newServiceConnection = this.serviceConnection = new ServiceConnectionImpl();
+            }
         }
-        throw new RuntimeException("Target service not found. Intent: " + serviceIntent);
+        if (newServiceConnection != null) {
+            if (context.bindService(serviceIntent, serviceConnection, flags)) {
+                Log.v(TAG, "bindService(): service binding successful");
+                return;
+            }
+            throw new RuntimeException("Target service not found. Intent: " + serviceIntent);
+        } else if (DEBUG) {
+            Log.v(TAG, "bindService(): connection attempt already in progress");
+        }
     }
 
     public void unbindService() {
         if (DEBUG) {
             Log.v(TAG, "unbindService(): service=" + serviceIntent);
         }
-        if (isServiceReady()) {
+        ServiceConnection serviceConnection;
+        synchronized (this) {
+            serviceConnection = this.serviceConnection;
+            this.serviceConnection = null;
+        }
+        if (serviceConnection != null) {
             context.unbindService(serviceConnection);
+        } else if (DEBUG){
+            Log.v(TAG, "unbindService(): service " + serviceIntent + " already disconnected");
         }
     }
 
@@ -117,7 +135,7 @@ public class ServiceConnector<T> {
         return accessor;
     }
 
-    private final ServiceConnection serviceConnection = new ServiceConnection() {
+    private class ServiceConnectionImpl implements ServiceConnection {
         @Override
         public void onServiceConnected(ComponentName name, IBinder serviceBinder) {
             T serviceInterface = asInterface(serviceBinder);
@@ -139,7 +157,7 @@ public class ServiceConnector<T> {
                 connectionLock.notifyAll();
             }
         }
-    };
+    }
 
     @SuppressWarnings("unchecked")
     protected T asInterface(IBinder binder) {
@@ -157,13 +175,13 @@ public class ServiceConnector<T> {
 
     protected void onServiceConnected(ComponentName name) {
         if (DEBUG) {
-            Log.v(TAG, "Connected to service " + name != null ? name.toShortString() : null);
+            Log.v(TAG, "Connected to service " + (name != null ? name.toShortString() : null));
         }
     }
 
     protected void onServiceDisconnected(ComponentName name) {
         if (DEBUG) {
-            Log.v(TAG, "Disconnected from service " + name != null ? name.toShortString() : null);
+            Log.v(TAG, "Disconnected from service " + (name != null ? name.toShortString() : null));
         }
     }
 
