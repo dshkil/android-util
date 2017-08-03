@@ -35,7 +35,7 @@ public abstract class ServiceAccessor<T> implements Releasable {
 
     private static final String TAG = "ServiceAccessor";
 
-    public static boolean DEBUG = BuildConfig.DEBUG;
+    public static boolean DEBUG = true;
 
     private volatile ServiceConnector<T> serviceConnector;
 
@@ -172,7 +172,7 @@ public abstract class ServiceAccessor<T> implements Releasable {
         super.finalize();
         if (serviceConnector != null) {
             if (DEBUG) {
-                Log.w(TAG, "Service accessor should be released by user");
+                Log.i(TAG, "Service accessor should be released by user");
             }
         }
         try {
