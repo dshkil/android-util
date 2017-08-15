@@ -204,6 +204,10 @@ public class RequestBuilder {
         return withBody(RequestBody.create(contentType, file));
     }
 
+    public RequestBuilder withEmptyBody() {
+        return withBody(EmptyRequestBody.INSTANCE);
+    }
+
     private static void checkMethodSupportsBody(HttpMethod method) throws IllegalStateException {
         switch (method) {
             case POST:
