@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package com.shkil.android.util.net;
 
+import android.support.annotation.Nullable;
+
 import java.io.IOException;
 import java.lang.reflect.Type;
 
@@ -22,6 +24,6 @@ import okhttp3.Response;
 
 public interface ResponseParser {
 
-    <T> T parseResponse(Response response, Type resultType) throws IOException;
+    <T> T parseResponse(Response response, @Nullable Type resultType) throws IOException;
 
 }

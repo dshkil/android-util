@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,9 @@
  */
 package com.shkil.android.util.net.parser;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 import com.shkil.android.util.net.ResponseParser;
 
 import org.json.JSONException;
@@ -29,7 +32,10 @@ import okio.ByteString;
 
 public abstract class AbstractResponseParser implements ResponseParser {
 
-    public <T> T parseResponse(Response response, Type resultType) throws IOException {
+    public <T> T parseResponse(Response response, @Nullable Type resultType) throws IOException {
+        if (resultType == null) {
+            return null;
+        }
         ResponseBody responseBody = response.body();
         T object = readStandardType(responseBody, resultType);
         if (object != null) {
@@ -38,7 +44,7 @@ public abstract class AbstractResponseParser implements ResponseParser {
         return readObject(responseBody, resultType);
     }
 
-    protected <T> T readStandardType(ResponseBody body, Type resultType) throws IOException {
+    protected <T> T readStandardType(ResponseBody body, @NonNull Type resultType) throws IOException {
         if (resultType == String.class) {
             return (T) body.string();
         } else if (resultType == JSONObject.class) {
@@ -55,6 +61,6 @@ public abstract class AbstractResponseParser implements ResponseParser {
         return null;
     }
 
-    protected abstract <T> T readObject(ResponseBody responseBody, Type type) throws IOException;
+    protected abstract <T> T readObject(ResponseBody responseBody, @NonNull Type type) throws IOException;
 
 }
