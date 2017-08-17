@@ -104,7 +104,9 @@ public abstract class ServiceAccessor<T> implements Releasable {
                 callbackExecutor.execute(new Runnable() {
                     @Override
                     public void run() {
-                        callback.onServiceReady(service);
+                        if (!isReleased()) {
+                            callback.onServiceReady(service);
+                        }
                     }
                 });
             }
@@ -118,13 +120,19 @@ public abstract class ServiceAccessor<T> implements Releasable {
                     } catch (RemoteException ex) {
                         throw new RuntimeException(ex);
                     }
+                    if (isReleased()) {
+                        return;
+                    }
                     if (callbackExecutor == null) {
                         callback.onServiceReady(service);
+
                     } else {
                         callbackExecutor.execute(new Runnable() {
                             @Override
                             public void run() {
-                                callback.onServiceReady(service);
+                                if (!isReleased()) {
+                                    callback.onServiceReady(service);
+                                }
                             }
                         });
                     }
@@ -151,11 +159,17 @@ public abstract class ServiceAccessor<T> implements Releasable {
         return getServiceConnector().isServiceReady();
     }
 
-    public synchronized final void release() {
+    public synchronized final boolean release() {
         if (serviceConnector != null) {
             onRelease(serviceConnector);
             serviceConnector = null;
+            return true;
         }
+        return false;
+    }
+
+    public synchronized final boolean isReleased() {
+        return serviceConnector == null;
     }
 
     protected abstract void onRelease(ServiceConnector<T> serviceConnector);

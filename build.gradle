@@ -4,8 +4,8 @@ ext {
     compileSdkVersion = 25
     buildToolsVersion = '25.0.2'
 
-    projectVersion = '0.9.50'
-    projectVersionCode = 50
+    projectVersion = '0.9.52'
+    projectVersionCode = 52
 }
 
 allprojects {

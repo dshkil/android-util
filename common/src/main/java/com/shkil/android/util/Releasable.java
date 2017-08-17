@@ -17,6 +17,6 @@ package com.shkil.android.util;
 
 public interface Releasable {
 
-    void release();
+    boolean release();
 
 }
