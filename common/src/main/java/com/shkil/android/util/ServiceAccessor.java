@@ -21,7 +21,6 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import com.shkil.android.util.common.BuildConfig;
 import com.shkil.android.util.concurrent.MainThread;
 import com.shkil.android.util.concurrent.ResultFuture;
 import com.shkil.android.util.concurrent.ResultFutures;
@@ -92,11 +91,11 @@ public abstract class ServiceAccessor<T> implements Releasable {
         void onServiceReady(T service);
     }
 
-    public void getServiceAsync(final OnServiceReadyCallback<T> callback) {
-        getServiceAsync(callback, MainThread.EXECUTOR);
+    public ServiceAccessor<T> getServiceAsync(final OnServiceReadyCallback<T> callback) {
+        return getServiceAsync(callback, MainThread.EXECUTOR);
     }
 
-    public void getServiceAsync(final OnServiceReadyCallback<T> callback, final Executor callbackExecutor) {
+    public ServiceAccessor<T> getServiceAsync(final OnServiceReadyCallback<T> callback, final Executor callbackExecutor) {
         final T service = getServiceIfPossible();
         if (service != null) {
             if (callbackExecutor == null) {
@@ -132,6 +131,7 @@ public abstract class ServiceAccessor<T> implements Releasable {
                 }
             });
         }
+        return this;
     }
 
     public ResultFuture<T> getServiceAsync() {
