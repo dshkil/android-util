@@ -64,6 +64,10 @@ public class ServiceConnector<T> {
     private final Object connectionLock = new Object();
     private final AtomicInteger accessorCount = new AtomicInteger();
 
+    public ServiceConnector(Context context, Class<?> serviceClass, Class<T> interfaceClass) {
+        this(context, new Intent(context, serviceClass), interfaceClass);
+    }
+
     public ServiceConnector(Context context, Intent serviceIntent, Class<T> interfaceClass) {
         this.context = context.getApplicationContext();
         this.serviceIntent = serviceIntent;
@@ -112,7 +116,7 @@ public class ServiceConnector<T> {
         }
         if (serviceConnection != null) {
             context.unbindService(serviceConnection);
-        } else if (DEBUG){
+        } else if (DEBUG) {
             Log.v(TAG, "unbindService(): service " + serviceIntent + " already disconnected");
         }
     }
