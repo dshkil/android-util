@@ -16,6 +16,11 @@ class EmptyRequestBody extends RequestBody {
     }
 
     @Override
+    public long contentLength() throws IOException {
+        return 0;
+    }
+
+    @Override
     public void writeTo(BufferedSink sink) throws IOException {
     }
 }
