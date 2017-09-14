@@ -1,3 +1,18 @@
+/*
+ * Copyright (C) 2017 Dmytro Shkil
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.shkil.android.util.event;
 
 import android.content.BroadcastReceiver;
@@ -10,7 +25,7 @@ import android.os.Message;
 import android.os.Process;
 import android.util.Log;
 
-import com.shkil.android.util.Utils;
+import com.shkil.android.util.concurrent.MainThread;
 import com.shkil.android.util.events.BuildConfig;
 import com.squareup.otto.Bus;
 
@@ -88,26 +103,48 @@ public class EventBus {
         if (event == null) {
             throw new IllegalArgumentException("event == null");
         }
-        post(event, false);
+        post(event, -1, false);
     }
 
     public void post(IEvent event) {
-        post(event, true);
+        post(event, -1, true);
     }
 
-    private void post(IEvent event, boolean original) {
+    public void postDelayed(IEvent event, long delayMillis) {
+        post(event, delayMillis, true);
+    }
+
+    @SuppressWarnings("WrongConstant")
+    private void post(final IEvent event, long delayMillis, final boolean original) {
         if (original && traceAppEvents) {
             int priority = event.getLogLevel();
             if (priority > 0) {
-                //noinspection WrongConstant
-                Log.println(priority, TAG, "post: " + event);
+                if (delayMillis < 0) {
+                    Log.println(priority, TAG, "post: " + event);
+                } else {
+                    Log.println(priority, TAG, "postDelayed(" + delayMillis + "): " + event);
+                }
             }
         }
-        if (Utils.isRunningOnMainThread()) {
-            eventBus.post(event);
+        if (delayMillis < 0) {
+            if (MainThread.isCurrent()) {
+                eventBus.post(event);
+            } else {
+                Message.obtain(handler, MSG_POST_EVENT, event).sendToTarget();
+            }
+            broadcastEventIfNeeded(event, original);
         } else {
-            Message.obtain(handler, MSG_POST_EVENT, event).sendToTarget();
+            handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    eventBus.post(event);
+                    broadcastEventIfNeeded(event, original);
+                }
+            }, delayMillis);
         }
+    }
+
+    protected void broadcastEventIfNeeded(IEvent event, boolean original) {
         if (supportEventBroadcasting && original && event instanceof IBroadcastEvent) {
             Intent intent = new Intent(eventBroadcastAction)
                     .putExtra("event", (IBroadcastEvent) event)
