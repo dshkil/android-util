@@ -29,6 +29,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 
 import static android.os.AsyncTask.THREAD_POOL_EXECUTOR;
+import static com.shkil.android.util.Utils.isRunningOnMainThread;
 
 public abstract class ServiceAccessor<T> implements Releasable {
 
@@ -67,7 +68,7 @@ public abstract class ServiceAccessor<T> implements Releasable {
     @Nullable
     public T getServiceIfPossible() {
         try {
-            return getService(!Utils.isRunningOnMainThread());
+            return getService(!isRunningOnMainThread());
         } catch (RemoteException ex) {
             Log.w(TAG, ex);
             return null;
@@ -75,13 +76,13 @@ public abstract class ServiceAccessor<T> implements Releasable {
     }
 
     @NonNull
-    public T getServiceOrThrowRuntime() {
+    public T getServiceOrThrow() throws RuntimeException {
         T service = getServiceIfPossible();
         if (service != null) {
             return service;
         }
         try {
-            return getServiceConnector().getService(true);
+            return getService(true);
         } catch (RemoteException ex) {
             throw new RuntimeException(ex);
         }

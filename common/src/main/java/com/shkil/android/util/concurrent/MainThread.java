@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package com.shkil.android.util.concurrent;
 import android.os.Handler;
 import android.os.Looper;
 
+import static java.lang.Thread.currentThread;
+
 public final class MainThread {
 
     public static final Looper LOOPER = Looper.getMainLooper();
@@ -32,10 +34,38 @@ public final class MainThread {
     }
 
     /**
-     * Causes the runnable to be added to the message queue
+     * @see Handler#post(Runnable)
      */
     public static void post(Runnable runnable) {
-        EXECUTOR.post(runnable);
+        HANDLER.post(runnable);
+    }
+
+    /**
+     * @see Handler#postDelayed(Runnable, long)
+     */
+    public static void postDelayed(Runnable runnable, long delayMillis) {
+        HANDLER.postDelayed(runnable, delayMillis);
+    }
+
+    /**
+     * @see Handler#postAtTime(Runnable, long)
+     */
+    public static void postAtTime(Runnable runnable, long uptimeMillis) {
+        HANDLER.postAtTime(runnable, uptimeMillis);
+    }
+
+    /**
+     * @see Handler#removeCallbacks(Runnable)
+     */
+    public static void removeCallbacks(Runnable runnable) {
+        HANDLER.removeCallbacks(runnable);
+    }
+
+    /**
+     * @see Handler#postAtTime(Runnable, long)
+     */
+    public static boolean isCurrent() {
+        return currentThread() == LOOPER.getThread();
     }
 
 }

@@ -81,7 +81,7 @@ public abstract class ReceiverResultFuture<V> extends LatchResultFuture<V> {
 
     @Override
     protected void checkResultCallerThread() {
-        if (MainThreadExecutor.isRunningOnMainThread()) {
+        if (MainThread.isCurrent()) {
             throw new IllegalStateException("Method invoked from the main thread");
         }
     }

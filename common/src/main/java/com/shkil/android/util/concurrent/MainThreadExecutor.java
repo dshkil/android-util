@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class MainThreadExecutor implements Executor {
 
     @Override
     public void execute(Runnable runnable) {
-        if (isRunningOnMainThread()) {
+        if (MainThread.isCurrent()) {
             runnable.run();
         } else {
             post(runnable);
@@ -48,12 +48,11 @@ public class MainThreadExecutor implements Executor {
         MainThread.HANDLER.post(runnable);
     }
 
-    public void remove(Runnable runnable) {
+    /**
+     * Remove any pending posts of runnable that are in the message queue
+     */
+    public void removeCallbacks(Runnable runnable) {
         MainThread.HANDLER.removeCallbacks(runnable);
-    }
-
-    protected static boolean isRunningOnMainThread() {
-        return Thread.currentThread() == MainThread.LOOPER.getThread();
     }
 
 }
