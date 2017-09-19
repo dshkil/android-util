@@ -73,6 +73,14 @@ public class ResultFutures {
         return ResultFutureTask.execute(task, taskExecutor);
     }
 
+    public static <V> LatchResultFuture<V> latch() {
+        return latch(MainThreadExecutor.getInstance());
+    }
+
+    public static <V> LatchResultFuture<V> latch(Executor defaultResultExecutor) {
+        return new LatchResultFuture<>(defaultResultExecutor);
+    }
+
     private static class ImmediateResultFuture<V> implements ResultFuture<V> {
         private final Result<V> result;
         private final AtomicBoolean cancelled = new AtomicBoolean();
