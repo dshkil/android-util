@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,13 @@
  */
 package com.shkil.android.util.concurrent;
 
+import android.support.annotation.NonNull;
+
 import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueConverter;
 import com.shkil.android.util.ValueListener;
 
 import java.util.concurrent.ExecutionException;
@@ -32,16 +35,35 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
 
     private final ResultFuture<W> sourceFuture;
     private volatile Result<V> convertedResult;
+    private final Executor converterExecutor;
+
+    static <V, R> ResultFuture<R> convert(ResultFuture<V> source, ValueConverter<V, R> converter) {
+        return convert(source, converter, null);
+    }
+
+    static <V, R> ResultFuture<R> convert(ResultFuture<V> source, final ValueConverter<V, R> converter, Executor converterExecutor) {
+        return new ResultFutureAdapter<V, R>(source, converterExecutor) {
+            @Override
+            protected R convertValue(V value) throws Exception {
+                return converter.convert(value);
+            }
+        };
+    }
 
     protected ResultFutureAdapter(ResultFuture<W> source) {
+        this(source, source.getDefaultResultExecutor());
+    }
+
+    protected ResultFutureAdapter(ResultFuture<W> source, Executor converterExecutor) {
         if (source == null) {
             throw new NullPointerException();
         }
         this.sourceFuture = source;
+        this.converterExecutor = converterExecutor;
     }
 
     @SuppressWarnings({"unchecked"})
-    protected Result<V> handleResult(Result<W> result) {
+    protected Result<V> handleResult(@NonNull Result<W> result) {
         if (convertedResult != null) {
             return convertedResult;
         }
@@ -68,12 +90,26 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
         }
     }
 
+    void onResultCallback(Result<W> in, final ResultListener<V> listener, Executor resultExecutor) {
+        final Result<V> out = handleResult(in);
+        if (resultExecutor == null || resultExecutor == converterExecutor) {
+            listener.onResult(out);
+        } else {
+            resultExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    listener.onResult(out);
+                }
+            });
+        }
+    }
+
     @SuppressWarnings("unchecked")
     protected Result<V> processException(Result<W> result) {
         return (Result<V>) result;
     }
 
-    protected abstract V convertValue(W value) throws Exception;
+    protected abstract V convertValue(@Nullable W value) throws Exception;
 
     @Override
     public boolean isResultReady() {
@@ -83,7 +119,8 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     @Nullable
     @Override
     public Result<V> peekResult() {
-        return handleResult(sourceFuture.peekResult());
+        Result<W> result = sourceFuture.peekResult();
+        return result != null ? handleResult(result) : null;
     }
 
     @Nullable
@@ -171,20 +208,20 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
         sourceFuture.onResult(new ResultListener<W>() {
             @Override
             public void onResult(Result<W> result) {
-                listener.onResult(handleResult(result));
+                onResultCallback(result, listener, getDefaultResultExecutor());
             }
-        });
+        }, converterExecutor);
         return this;
     }
 
     @Override
-    public ResultFuture<V> onResult(final ResultListener<V> listener, Executor resultExecutor) {
+    public ResultFuture<V> onResult(final ResultListener<V> listener, final Executor resultExecutor) {
         sourceFuture.onResult(new ResultListener<W>() {
             @Override
             public void onResult(Result<W> result) {
-                listener.onResult(handleResult(result));
+                onResultCallback(result, listener, resultExecutor);
             }
-        }, resultExecutor);
+        }, converterExecutor);
         return this;
     }
 
@@ -216,5 +253,20 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     public ResultFuture<V> onCompleted(CompletionListener listener, Executor resultExecutor) {
         sourceFuture.onCompleted(listener, resultExecutor);
         return this;
+    }
+
+    @Override
+    public <R> ResultFuture<R> convert(ValueConverter<V, R> converter) {
+        return ResultFutureAdapter.convert(this, converter);
+    }
+
+    @Override
+    public <R> ResultFuture<R> convert(Executor converterExecutor, ValueConverter<V, R> converter) {
+        return ResultFutureAdapter.convert(this, converter, converterExecutor);
+    }
+
+    @Override
+    public Executor getDefaultResultExecutor() {
+        return sourceFuture.getDefaultResultExecutor();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueConverter;
 import com.shkil.android.util.ValueListener;
 import com.shkil.android.util.concurrent.AbstractResultFuture.OnResultRunnable;
 
@@ -260,6 +261,21 @@ public class ResultFutures {
         @Override
         public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
             return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
+        }
+
+        @Override
+        public <R> ResultFuture<R> convert(ValueConverter<V, R> converter) {
+            return ResultFutureAdapter.convert(this, converter);
+        }
+
+        @Override
+        public <R> ResultFuture<R> convert(Executor converterExecutor, ValueConverter<V, R> converter) {
+            return ResultFutureAdapter.convert(this, converter, converterExecutor);
+        }
+
+        @Override
+        public Executor getDefaultResultExecutor() {
+            return defaultResultExecutor;
         }
     }
 

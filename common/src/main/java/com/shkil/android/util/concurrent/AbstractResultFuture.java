@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
+import com.shkil.android.util.ValueConverter;
 import com.shkil.android.util.ValueListener;
 
 import java.util.ArrayList;
@@ -32,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 abstract class AbstractResultFuture<V> implements ResultFuture<V> {
@@ -347,9 +347,20 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
     }
 
+    @Override
+    public <R> ResultFuture<R> convert(ValueConverter<V, R> converter) {
+        return ResultFutureAdapter.convert(this, converter);
+    }
+
+    @Override
+    public <R> ResultFuture<R> convert(Executor converterExecutor, ValueConverter<V, R> converter) {
+        return ResultFutureAdapter.convert(this, converter, converterExecutor);
+    }
+
     static class OnResultRunnable<V> implements Runnable {
         private final ResultListener<V> listener;
         private final Result<V> result;
+
         private final AtomicBoolean cancelled;
 
         public OnResultRunnable(ResultListener<V> listener, Result<V> result, AtomicBoolean cancelled) {
@@ -370,4 +381,8 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     protected void checkResultCallerThread() {
     }
 
+    @Override
+    public Executor getDefaultResultExecutor() {
+        return defaultResultExecutor;
+    }
 }

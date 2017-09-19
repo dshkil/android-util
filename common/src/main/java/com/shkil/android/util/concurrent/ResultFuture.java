@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import com.shkil.android.util.Cancellable;
 import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
+import com.shkil.android.util.ValueConverter;
 import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueListener;
 
@@ -114,5 +115,9 @@ public interface ResultFuture<V> extends Cancellable {
 
     ResultFuture<V> onCompleted(CompletionListener listener, Executor listenerExecutor);
 
+    <R> ResultFuture<R> convert(ValueConverter<V, R> converter);
 
+    <R> ResultFuture<R> convert(@Nullable Executor converterExecutor, ValueConverter<V, R> converter);
+
+    Executor getDefaultResultExecutor();
 }
