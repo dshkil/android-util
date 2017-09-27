@@ -185,7 +185,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     protected abstract Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException,
             TimeoutException, ExecutionException;
 
-    protected final void fireResult(@NonNull Result<V> result) {
+    protected void fireResult(@NonNull Result<V> result) {
         try {
             if (isCancelled()) {
                 return;
