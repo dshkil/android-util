@@ -124,7 +124,7 @@ public class AbstractNetClientTest {
         Response response = netClient.doHeadRequest();
         assertNotNull(response);
         assertEquals(200, response.code());
-        assertEquals(196, response.body().contentLength());
+        assertEquals(224, response.body().contentLength());
     }
 
     @Test
@@ -133,7 +133,7 @@ public class AbstractNetClientTest {
         Response response = netClient.doDeleteRequest();
         assertNotNull(response);
         assertEquals(200, response.code());
-        assertEquals(262, response.body().contentLength());
+        assertEquals(318, response.body().contentLength());
     }
 
 }

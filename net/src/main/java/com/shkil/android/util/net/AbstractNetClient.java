@@ -83,7 +83,7 @@ public abstract class AbstractNetClient {
     }
 
     @GuardedBy("this")
-    private final Map<String,OkHttpClient> httpClients = new HashMap<>();
+    private final Map<String, OkHttpClient> httpClients = new HashMap<>();
 
     private volatile ResponseParser responseParser;
 
@@ -310,8 +310,16 @@ public abstract class AbstractNetClient {
         });
     }
 
+    protected final <T> T execute(Request request, Class<T> resultType) throws IOException {
+        return execute(request, (Type) resultType);
+    }
+
     protected final <T> T execute(Request request, Type resultType) throws IOException {
         return execute(request, resultType, null);
+    }
+
+    protected final <T> T execute(Request request, Class<T> resultType, Cancellator cancellator) throws IOException {
+        return execute(request, (Type) resultType, cancellator);
     }
 
     protected final <T> T execute(Request request, Type resultType, Cancellator cancellator) throws IOException {
@@ -322,6 +330,10 @@ public abstract class AbstractNetClient {
         } finally {
             closeResponse(response);
         }
+    }
+
+    protected final <T> ResultFuture<T> executeSerialAsync(Request request, Class<T> resultType) {
+        return executeSerialAsync(request, (Type) resultType);
     }
 
     protected final <T> ResultFuture<T> executeSerialAsync(final Request request, final Type resultType) {
@@ -358,16 +370,32 @@ public abstract class AbstractNetClient {
         return executeAsync(requestBuilder.build());
     }
 
+    protected final <T> T execute(RequestBuilder requestBuilder, Class<T> resultType) throws IOException {
+        return execute(requestBuilder, (Type) resultType);
+    }
+
     protected final <T> T execute(RequestBuilder requestBuilder, Type resultType) throws IOException {
         return execute(requestBuilder, resultType, null);
+    }
+
+    protected final <T> T execute(RequestBuilder requestBuilder, Class<T> resultType, Cancellator cancellator) throws IOException {
+        return execute(requestBuilder, (Type) resultType, cancellator);
     }
 
     protected final <T> T execute(RequestBuilder requestBuilder, Type resultType, Cancellator cancellator) throws IOException {
         return execute(requestBuilder.build(), resultType, cancellator);
     }
 
+    protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, Class<T> resultType) {
+        return executeSerialAsync(requestBuilder, (Type) resultType);
+    }
+
     protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, Type resultType) {
         return executeSerialAsync(requestBuilder.build(), resultType);
+    }
+
+    protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Class<T> resultType) {
+        return executeAsync(requestBuilder, (Type) resultType);
     }
 
     protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Type resultType) {
@@ -384,7 +412,7 @@ public abstract class AbstractNetClient {
 
     protected final <T> ResultFuture<T> executeAsync(Request request, final T successValue) {
         ResultFuture<Response> future = executeAsync(request);
-        return new ResultFutureAdapter<Response,T>(future) {
+        return new ResultFutureAdapter<Response, T>(future) {
             @Override
             protected T convertValue(Response response) throws Exception {
                 return successValue;
@@ -394,7 +422,7 @@ public abstract class AbstractNetClient {
 
     protected final <T> ResultFuture<T> executeSerialAsync(Request request, final T successValue) {
         ResultFuture<Response> future = executeSerialAsync(request);
-        return new ResultFutureAdapter<Response,T>(future) {
+        return new ResultFutureAdapter<Response, T>(future) {
             @Override
             protected T convertValue(Response response) throws Exception {
                 return successValue;
@@ -459,7 +487,7 @@ public abstract class AbstractNetClient {
             String type;
             if (authFlag.startsWith(FLAG_REQUIRED)) {
                 type = authFlag.substring(FLAG_REQUIRED.length() + 1);
-            }  else if (authFlag.startsWith(FLAG_DESIRED)) {
+            } else if (authFlag.startsWith(FLAG_DESIRED)) {
                 type = authFlag.substring(FLAG_DESIRED.length() + 1);
             } else {
                 throw new IllegalArgumentException();
