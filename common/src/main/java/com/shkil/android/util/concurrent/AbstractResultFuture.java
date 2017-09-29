@@ -21,7 +21,7 @@ import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
-import com.shkil.android.util.ValueConverter;
+import com.shkil.android.util.ValueMapper;
 import com.shkil.android.util.ValueListener;
 
 import java.util.ArrayList;
@@ -348,13 +348,13 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
     }
 
     @Override
-    public <R> ResultFuture<R> convert(ValueConverter<V, R> converter) {
-        return ResultFutureAdapter.convert(this, converter);
+    public <R> ResultFuture<R> map(ValueMapper<? super V, ? extends R> mapper) {
+        return ResultFutureAdapter.map(this, mapper);
     }
 
     @Override
-    public <R> ResultFuture<R> convert(Executor converterExecutor, ValueConverter<V, R> converter) {
-        return ResultFutureAdapter.convert(this, converter, converterExecutor);
+    public <R> ResultFuture<R> map(Executor mapperExecutor, ValueMapper<? super V, ? extends R> mapper) {
+        return ResultFutureAdapter.map(this, mapper, mapperExecutor);
     }
 
     static class OnResultRunnable<V> implements Runnable {

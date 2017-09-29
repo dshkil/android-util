@@ -17,8 +17,8 @@ package com.shkil.android.util;
 
 import android.support.annotation.Nullable;
 
-public interface ValueConverter<V, R> {
+public interface ValueMapper<V, R> {
 
-    R convert(@Nullable V value) throws Exception;
+    R map(@Nullable V value) throws Exception;
 
 }

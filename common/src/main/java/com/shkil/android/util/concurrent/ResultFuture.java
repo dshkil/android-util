@@ -19,7 +19,7 @@ import com.shkil.android.util.Cancellable;
 import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
-import com.shkil.android.util.ValueConverter;
+import com.shkil.android.util.ValueMapper;
 import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueListener;
 
@@ -115,9 +115,9 @@ public interface ResultFuture<V> extends Cancellable {
 
     ResultFuture<V> onCompleted(CompletionListener listener, Executor listenerExecutor);
 
-    <R> ResultFuture<R> convert(ValueConverter<V, R> converter);
+    <R> ResultFuture<R> map(ValueMapper<? super V, ? extends R> mapper);
 
-    <R> ResultFuture<R> convert(@Nullable Executor converterExecutor, ValueConverter<V, R> converter);
+    <R> ResultFuture<R> map(@Nullable Executor mapperExecutor, ValueMapper<? super V, ? extends R> mapper);
 
     Executor getDefaultResultExecutor();
 }

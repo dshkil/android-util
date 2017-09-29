@@ -21,8 +21,8 @@ import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
-import com.shkil.android.util.ValueConverter;
 import com.shkil.android.util.ValueListener;
+import com.shkil.android.util.ValueMapper;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -37,15 +37,15 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     private volatile Result<V> convertedResult;
     private final Executor converterExecutor;
 
-    static <V, R> ResultFuture<R> convert(ResultFuture<V> source, ValueConverter<V, R> converter) {
-        return convert(source, converter, null);
+    static <V, R> ResultFuture<R> map(ResultFuture<V> source, ValueMapper<? super V, ? extends R> mapper) {
+        return map(source, mapper, null);
     }
 
-    static <V, R> ResultFuture<R> convert(ResultFuture<V> source, final ValueConverter<V, R> converter, Executor converterExecutor) {
-        return new ResultFutureAdapter<V, R>(source, converterExecutor) {
+    static <V, R> ResultFuture<R> map(ResultFuture<V> source, final ValueMapper<? super V, ? extends R> mapper, Executor mapperExecutor) {
+        return new ResultFutureAdapter<V, R>(source, mapperExecutor) {
             @Override
             protected R convertValue(V value) throws Exception {
-                return converter.convert(value);
+                return mapper.map(value);
             }
         };
     }
@@ -256,13 +256,13 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
     }
 
     @Override
-    public <R> ResultFuture<R> convert(ValueConverter<V, R> converter) {
-        return ResultFutureAdapter.convert(this, converter);
+    public <R> ResultFuture<R> map(ValueMapper<? super V, ? extends R> mapper) {
+        return ResultFutureAdapter.map(this, mapper);
     }
 
     @Override
-    public <R> ResultFuture<R> convert(Executor converterExecutor, ValueConverter<V, R> converter) {
-        return ResultFutureAdapter.convert(this, converter, converterExecutor);
+    public <R> ResultFuture<R> map(Executor mapperExecutor, ValueMapper<? super V, ? extends R> mapper) {
+        return ResultFutureAdapter.map(this, mapper, mapperExecutor);
     }
 
     @Override
