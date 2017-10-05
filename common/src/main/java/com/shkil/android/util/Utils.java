@@ -429,6 +429,13 @@ public class Utils {
         return typedValue;
     }
 
+    public static Exception asException(Throwable throwable) {
+        if (throwable instanceof Exception) {
+            return (Exception) throwable;
+        }
+        return new Exception(throwable);
+    }
+
     public static IOException asIOException(Throwable ex) throws IOException {
         if (ex instanceof IOException) {
             return (IOException) ex;
@@ -585,5 +592,11 @@ public class Utils {
         }
     }
 
-
+    public static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ex) {
+            // ok
+        }
+    }
 }
