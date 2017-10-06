@@ -18,13 +18,13 @@ package com.shkil.android.util.cache;
 /**
  * Implementation of cache to keep one latest pair of key-value
  */
-public class SingleValueCache<K, V> implements Cache<K,V> {
+public class SingleValueCache<K, V> implements Cache<K, V> {
 
     private volatile K key;
     private volatile V value;
 
-    public static <K, V> SingleValueCache<K,V> newCache() {
-        return new SingleValueCache<K,V>();
+    public static <K, V> SingleValueCache<K, V> newCache() {
+        return new SingleValueCache<K, V>();
     }
 
     @Override
@@ -95,6 +95,11 @@ public class SingleValueCache<K, V> implements Cache<K,V> {
     }
 
     @Override
+    public boolean isQuick() {
+        return true;
+    }
+
+    @Override
     public V remove(K key) {
         if (key == null) {
             throw new NullPointerException("key == null");
@@ -124,7 +129,6 @@ public class SingleValueCache<K, V> implements Cache<K,V> {
         return key == null ? 0 : 1;
     }
 
-    @Override
     public int maxSize() {
         return 1;
     }

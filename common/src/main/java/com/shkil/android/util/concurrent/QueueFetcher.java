@@ -16,8 +16,10 @@
 package com.shkil.android.util.concurrent;
 
 import android.annotation.TargetApi;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ValueFetcher;
@@ -42,6 +44,8 @@ import javax.annotation.concurrent.GuardedBy;
 
 public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
+    private static final String TAG = "QueueFetcher";
+
     public static final int RUNNING_TASKS_LIMIT = 1;
 
     private final Executor defaultResultExecutor;
@@ -59,7 +63,10 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     private final List<FetcherListener<K, V>> listeners = new ArrayList<>(5);
 
     @GuardedBy("lock")
-    private volatile Cache<K, Result<V>> cache;
+    private volatile Cache<K, Result<V>> quickCache;
+
+    @GuardedBy("lock")
+    private volatile Cache<K, V> secondaryCache;
 
     private final Executor executor;
 
@@ -117,8 +124,8 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
-    public static <K,V> QueueFetcher<K,V> create(Executor executor, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
-        return new QueueFetcher<K,V>(executor, mayInterruptTask) {
+    public static <K, V> QueueFetcher<K, V> create(Executor executor, boolean mayInterruptTask, final ValueFetcher<K, V> fetcher) {
+        return new QueueFetcher<K, V>(executor, mayInterruptTask) {
             @Override
             protected V fetchValue(K key) throws Exception {
                 return fetcher.fetchValue(key);
@@ -126,8 +133,8 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         };
     }
 
-    public static <K,V> QueueFetcher<K,V> create(Executor executor, @Nullable Executor resultExecutor, boolean mayInterruptTask, final ValueFetcher<K,V> fetcher) {
-        return new QueueFetcher<K,V>(executor, resultExecutor, mayInterruptTask) {
+    public static <K, V> QueueFetcher<K, V> create(Executor executor, @Nullable Executor resultExecutor, boolean mayInterruptTask, final ValueFetcher<K, V> fetcher) {
+        return new QueueFetcher<K, V>(executor, resultExecutor, mayInterruptTask) {
             @Override
             protected V fetchValue(K key) throws Exception {
                 return fetcher.fetchValue(key);
@@ -145,15 +152,35 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         this.mayInterruptTask = mayInterruptTask;
     }
 
+    /**
+     * Set a primary cache. A quick cache only is allowed here
+     */
     public QueueFetcher<K, V> setCache(Cache<K, Result<V>> cache) {
+        if (!cache.isQuick()) {
+            throw new IllegalArgumentException("Attempt to set non-quick cache. Use setSecondaryCache() instead.");
+        }
         synchronized (lock) {
-            this.cache = cache;
+            this.quickCache = cache;
         }
         return this;
     }
 
     public Cache<K, Result<V>> getCache() {
-        return cache;
+        return quickCache;
+    }
+
+    /**
+     * Set a secondary cache
+     */
+    public QueueFetcher<K, V> setSecondaryCache(Cache<K, V> cache) {
+        synchronized (lock) {
+            this.secondaryCache = cache;
+        }
+        return this;
+    }
+
+    public Cache<K, V> getSecondaryCache() {
+        return secondaryCache;
     }
 
     public Priority getDefaultPriority() {
@@ -178,8 +205,8 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         ResultFuture<V> future;
         boolean forceExecute = (priority == Priority.IMMEDIATE);
         synchronized (lock) {
-            if (cache != null) {
-                Result<V> value = cache.get(key);
+            if (quickCache != null) {
+                Result<V> value = quickCache.get(key);
                 if (value != null) {
                     return ResultFutures.result(value);
                 }
@@ -250,9 +277,25 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
     protected abstract V fetchValue(K key) throws Exception;
 
-    protected void putResultToCache(K key, Result<V> result) {
+    @GuardedBy("lock")
+    protected void putResultToCache(final K key, final Result<V> result) {
         if (result.isSuccess()) {
-            cache.put(key, result);
+            if (quickCache != null) {
+                quickCache.put(key, result);
+            }
+            final Cache<K, V> secondaryCache = this.secondaryCache;
+            if (secondaryCache != null) {
+                AsyncTask.SERIAL_EXECUTOR.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            secondaryCache.put(key, result.getValue());
+                        } catch (RuntimeException ex) {
+                            Log.e(TAG, "Error putting value into secondary cache", ex);
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -265,7 +308,18 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             super(new Callable<Result<V>>() {
                 @Override
                 public Result<V> call() throws Exception {
-                    Result<V> result = null;
+                    Cache<K, V> secondaryCache = QueueFetcher.this.secondaryCache;
+                    if (secondaryCache != null) {
+                        try {
+                            V value = secondaryCache.get(key);
+                            if (value != null) {
+                                return Result.success(value);
+                            }
+                        } catch (RuntimeException ex) {
+                            Log.e(TAG, "Error getting value from secondary cache", ex);
+                        }
+                    }
+                    Result<V> result;
                     try {
                         result = Result.success(fetchValue(key));
                     } catch (Exception ex) {
@@ -302,9 +356,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             FetcherListener<K, V>[] listenersSnapshot;
             List<FetcherListener<K, V>> globalListeners = QueueFetcher.this.listeners;
             synchronized (lock) {
-                if (cache != null) {
-                    putResultToCache(key, result);
-                }
+                putResultToCache(key, result);
                 synchronized (globalListeners) {
                     int listenersCount = listeners.size();
                     listenersSnapshot = listeners.toArray(new FetcherListener[listenersCount + globalListeners.size()]);

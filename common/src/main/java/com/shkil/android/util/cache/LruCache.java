@@ -280,7 +280,6 @@ public class LruCache<K, V> implements Cache<K,V> {
      * number of entries in the cache. For all other caches, this returns the
      * maximum sum of the sizes of the entries in this cache.
      */
-    @Override
     public synchronized final int maxSize() {
         return maxSize;
     }
@@ -339,6 +338,11 @@ public class LruCache<K, V> implements Cache<K,V> {
     @Override
     public Object getSyncLock() {
         return this;
+    }
+
+    @Override
+    public boolean isQuick() {
+        return true;
     }
 
     @Override
