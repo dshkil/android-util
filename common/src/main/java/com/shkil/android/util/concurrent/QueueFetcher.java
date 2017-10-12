@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,11 @@ import android.annotation.TargetApi;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.SystemClock;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.shkil.android.util.Result;
+import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueFetcher;
 import com.shkil.android.util.cache.Cache;
 
@@ -39,7 +41,6 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
@@ -70,7 +71,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
     private final Executor executor;
 
-    private Priority defaultPriority = Priority.NORMAL;
+    private volatile RequestParams defaultRequestParams = RequestParams.DEFAULT;
 
     private static class QueueKey<K> implements Comparable<QueueKey> {
         private final K key;
@@ -183,32 +184,66 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         return secondaryCache;
     }
 
-    public Priority getDefaultPriority() {
-        return defaultPriority;
+    public QueueFetcher<K, V> setDefaultRequestParams(@Nullable RequestParams params) {
+        this.defaultRequestParams = params != null ? params : RequestParams.DEFAULT;
+        return this;
     }
 
-    public void setDefaultPriority(Priority defaultPriority) {
-        this.defaultPriority = defaultPriority;
+    public QueueFetcher<K, V> setDefaultRequestParams(@Nullable RequestParams.Builder params) {
+        this.defaultRequestParams = params != null ? params.build() : RequestParams.DEFAULT;
+        return this;
+    }
+
+    public RequestParams getDefaultRequestParams() {
+        return defaultRequestParams;
     }
 
     @Override
     public ResultFuture<V> fetch(K key) {
-        return fetch(key, defaultPriority);
+        return fetch(key, (RequestParams) null);
     }
 
     @Override
     public ResultFuture<V> fetch(K key, @Nullable Priority priority) {
-        if (priority == null) {
-            priority = defaultPriority;
+        RequestParams params = defaultRequestParams;
+        if (priority != null) {
+            if (params == RequestParams.DEFAULT) {
+                params = RequestParams.priority(priority);
+            } else {
+                params = params.toBuilder().priority(priority).build();
+            }
         }
+        return fetch(key, params);
+    }
+
+    @Override
+    public ResultFuture<V> fetch(K key, @Nullable RequestParams params) {
+        if (params == null) {
+            params = defaultRequestParams;
+        }
+        Priority priority = params.priority();
         FetcherTask task;
         ResultFuture<V> future;
         boolean forceExecute = (priority == Priority.IMMEDIATE);
+        V staleResult = null;
         synchronized (lock) {
             if (quickCache != null) {
-                Result<V> value = quickCache.get(key);
-                if (value != null) {
-                    return ResultFutures.result(value);
+                if (quickCache.isCacheControlSupported()) {
+                    Cache.Result<Result<V>> cacheResult = quickCache.get(key, params.cacheControl());
+                    if (cacheResult != null) {
+                        switch (cacheResult.getStatus()) {
+                            case GOOD:
+                                return ResultFutures.result(cacheResult.getValue());
+                            case STALE:
+                                staleResult = cacheResult.getValue().getValue();
+                                break;
+                        }
+                    }
+                } else {
+                    Result<V> value = quickCache.get(key);
+                    if (value != null) {
+                        return ResultFutures.result(value);
+                    }
                 }
             }
             long priorityOrdinal = priority.toLong(SystemClock.uptimeMillis());
@@ -232,7 +267,13 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                 }
             }
             task.incrementUseCount();
+            if (!params.cacheControl().noStore()) {
+                task.storeToCache(true);
+            }
             DeferredFetchingFuture deferredFuture = new DeferredFetchingFuture(task, priorityOrdinal, mayInterruptTask);
+            if (staleResult != null) {
+                deferredFuture.setStaleResult(staleResult, params.allowInterim());
+            }
             task.addListener(deferredFuture);
             future = deferredFuture;
         }
@@ -301,8 +342,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
     private class FetcherTask extends FutureTask<Result<V>> {
         private final K key;
+        @GuardedBy("lock")
         private final List<DeferredFetchingFuture> listeners = new ArrayList<DeferredFetchingFuture>(4);
+        @GuardedBy("lock")
         private int useCount;
+        @GuardedBy("lock")
+        private boolean storeToCache;
 
         public FetcherTask(final K key) {
             super(new Callable<Result<V>>() {
@@ -356,7 +401,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             FetcherListener<K, V>[] listenersSnapshot;
             List<FetcherListener<K, V>> globalListeners = QueueFetcher.this.listeners;
             synchronized (lock) {
-                putResultToCache(key, result);
+                if (storeToCache) {
+                    putResultToCache(key, result);
+                }
                 synchronized (globalListeners) {
                     int listenersCount = listeners.size();
                     listenersSnapshot = listeners.toArray(new FetcherListener[listenersCount + globalListeners.size()]);
@@ -405,6 +452,11 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         public K getKey() {
             return key;
         }
+
+        @GuardedBy("lock")
+        public void storeToCache(boolean store) {
+            this.storeToCache = store;
+        }
     }
 
     private long findMaxPriority(List<DeferredFetchingFuture> futures) {
@@ -437,6 +489,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         private volatile FetcherTask task;
         private final long priority;
         private final boolean mayInterruptTask;
+        @GuardedBy("this")
+        private V staleResult;
+        private boolean allowInterim;
 
         public DeferredFetchingFuture(FetcherTask task, long priority, boolean mayInterruptTask) {
             super(QueueFetcher.this.defaultResultExecutor);
@@ -449,7 +504,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         protected Result<V> fetchResult() throws ExecutionException, InterruptedException {
             FetcherTask task = this.task;
             if (task != null) {
-                return task.get();
+                return processResult(task.get(), staleResult);
             }
             throw new IllegalStateException("Should never happen");
         }
@@ -458,9 +513,16 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         protected Result<V> fetchResult(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException, ExecutionException {
             FetcherTask task = this.task;
             if (task != null) {
-                return task.get(timeout, unit);
+                return processResult(task.get(timeout, unit), staleResult);
             }
             throw new IllegalStateException("Should never happen");
+        }
+
+        private Result<V> processResult(Result<V> result, V defaultValue) {
+            if (result.getValue() == null && defaultValue != null) {
+                return Result.success(defaultValue);
+            }
+            return result;
         }
 
         @Override
@@ -492,7 +554,11 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
         @Override
         public void onResult(K key, Result<V> result) {
-            super.fireResult(result);
+            if (allowInterim || staleResult == null || result.isSuccess()) {
+                super.fireResult(result);
+            } else {
+                super.fireResult(Result.success(staleResult));
+            }
             this.task = null; // make eligible for gc
         }
 
@@ -504,6 +570,33 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         public long getPriority() {
             return priority;
         }
-    }
 
+        public synchronized void setStaleResult(V staleResult, boolean allowInterim) {
+            if (allowInterim) {
+                fireResult(Result.intermediate(staleResult));
+            }
+            this.staleResult = staleResult;
+            this.allowInterim = allowInterim;
+        }
+
+        @Override
+        Result<V> getResult() {
+            Result<V> result = super.getResult();
+            if (allowInterim || staleResult == null || (result != null && result.isSuccess())) {
+                return result;
+            }
+            return Result.success(staleResult);
+        }
+
+        @Override
+        protected synchronized ResultFuture<V> registerOnResult(ResultListener<V> listener, Executor resultExecutor) {
+            Result<V> result = super.peekResult();
+            if (allowInterim) {
+                if (staleResult != null && (!isResultReady() || result.isNotSuccess())) {
+                    executeOnResult(listener, Result.intermediate(staleResult), resultExecutor);
+                }
+            }
+            return super.registerOnResult(listener, resultExecutor);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package com.shkil.android.util.concurrent;
 
+import android.support.annotation.Nullable;
+
 import com.shkil.android.util.Result;
 
 public interface Fetcher<K, V> {
@@ -25,6 +27,7 @@ public interface Fetcher<K, V> {
 
     ResultFuture<V> fetch(K key);
 
-    ResultFuture<V> fetch(K key, Priority priority);
+    ResultFuture<V> fetch(K key, @Nullable Priority priority);
 
+    ResultFuture<V> fetch(K key, @Nullable RequestParams params);
 }

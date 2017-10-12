@@ -17,6 +17,11 @@
 
 package com.shkil.android.util.cache;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
+import com.shkil.android.util.cache.ControllableCache.CacheEntry;
+
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -28,9 +33,9 @@ import java.util.Map;
  * framework's implementation. See the framework SDK documentation for a class
  * overview.
  */
-public class LruCache<K, V> implements Cache<K,V> {
+public class LruCache<K, V> implements Cache<K, V> {
 
-    private final LinkedHashMap<K,V> map;
+    private final LinkedHashMap<K, V> map;
 
     /**
      * Size of this cache in units. Not necessarily the number of elements.
@@ -44,8 +49,12 @@ public class LruCache<K, V> implements Cache<K,V> {
     private int hitCount;
     private int missCount;
 
-    public static <K, V> LruCache<K,V> newCache(int maxSize) {
-        return new LruCache<K,V>(maxSize);
+    public static <K, V> LruCache<K, V> newCache(int maxSize) {
+        return new LruCache<>(maxSize);
+    }
+
+    public static <K, V> Cache<K, V> newControllableCache(int maxSize) {
+        return new ControllableCache<>(new LruCache<K, CacheEntry<V>>(maxSize));
     }
 
     /**
@@ -58,7 +67,7 @@ public class LruCache<K, V> implements Cache<K,V> {
             throw new IllegalArgumentException("maxSize <= 0");
         }
         this.maxSize = maxSize;
-        this.map = new LinkedHashMap<K,V>(0, 0.75f, true);
+        this.map = new LinkedHashMap<K, V>(0, 0.75f, true);
     }
 
     /**
@@ -116,6 +125,12 @@ public class LruCache<K, V> implements Cache<K,V> {
         }
     }
 
+    @NonNull
+    @Override
+    public Result<V> get(K key, @Nullable CacheControl cacheControl) {
+        return Result.normalOrNone(get(key));
+    }
+
     /**
      * Caches {@code value} for {@code key}. The value is moved to the head of
      * the queue.
@@ -164,7 +179,7 @@ public class LruCache<K, V> implements Cache<K,V> {
                     break;
                 }
 
-                Map.Entry<K,V> toEvict = map.entrySet().iterator().next();
+                Map.Entry<K, V> toEvict = map.entrySet().iterator().next();
                 key = toEvict.getKey();
                 value = toEvict.getValue();
                 map.remove(key);
@@ -324,8 +339,8 @@ public class LruCache<K, V> implements Cache<K,V> {
      * Returns a copy of the current contents of the cache, ordered from least
      * recently accessed to most recently accessed.
      */
-    public synchronized final Map<K,V> snapshot() {
-        return new LinkedHashMap<K,V>(map);
+    public synchronized final Map<K, V> snapshot() {
+        return new LinkedHashMap<K, V>(map);
     }
 
     @Override
@@ -343,6 +358,11 @@ public class LruCache<K, V> implements Cache<K,V> {
     @Override
     public boolean isQuick() {
         return true;
+    }
+
+    @Override
+    public boolean isCacheControlSupported() {
+        return false;
     }
 
     @Override

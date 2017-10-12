@@ -15,6 +15,9 @@
  */
 package com.shkil.android.util.cache;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 /**
  * Implementation of cache to keep one latest pair of key-value
  */
@@ -35,6 +38,12 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
         synchronized (getSyncLock()) {
             return key.equals(this.key) ? this.value : null;
         }
+    }
+
+    @NonNull
+    @Override
+    public Result<V> get(K key, @Nullable CacheControl cacheControl) {
+        return Result.normalOrNone(get(key));
     }
 
     @Override
@@ -97,6 +106,11 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
     @Override
     public boolean isQuick() {
         return true;
+    }
+
+    @Override
+    public boolean isCacheControlSupported() {
+        return false;
     }
 
     @Override

@@ -16,13 +16,14 @@
 package com.shkil.android.util.concurrent;
 
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import com.shkil.android.util.CompletionListener;
 import com.shkil.android.util.ExceptionListener;
 import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
-import com.shkil.android.util.ValueMapper;
 import com.shkil.android.util.ValueListener;
+import com.shkil.android.util.ValueMapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -149,28 +150,36 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         }
     }
 
-    @Override
-    public final Result<V> peekResult() {
+    Result<V> getResult() {
         return result;
     }
 
     @Override
+    public final Result<V> peekResult() {
+        return getResult();
+    }
+
+    @Override
     public V peekValue() {
+        Result<V> result = getResult();
         return result != null ? result.getValue() : null;
     }
 
     @Override
     public V peekValueOrThrow() throws Exception {
+        Result<V> result = getResult();
         return result != null ? result.getValueOrThrow() : null;
     }
 
     @Override
     public V peekValueOrThrowEx() throws ExecutionException {
+        Result<V> result = getResult();
         return result != null ? result.getValueOrThrowEx() : null;
     }
 
     @Override
     public V peekValueOrThrowRuntime() throws RuntimeException {
+        Result<V> result = getResult();
         return result != null ? result.getValueOrThrowRuntime() : null;
     }
 
@@ -194,20 +203,12 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
             if (listener != null) {
                 synchronized (this) {
                     if (listener != null) {
-                        if (resultExecutor != null) {
-                            resultExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
-                        } else {
-                            listener.onResult(result);
-                        }
+                        executeOnResult(listener, result, resultExecutor);
                     }
                     if (moreListeners != null) {
                         for (ListenerEntry<V> entry : moreListeners) {
                             Executor resultExecutor = entry.resultExecutor;
-                            if (resultExecutor != null) {
-                                resultExecutor.execute(new OnResultRunnable<>(entry.listener, result, cancelled));
-                            } else {
-                                entry.listener.onResult(result);
-                            }
+                            executeOnResult(entry.listener, result, resultExecutor);
                         }
                     }
                 }
@@ -294,25 +295,25 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
     @Override
     public final ResultFuture<V> onResult(ResultListener<V> listener) {
-        return onResult(listener, defaultResultExecutor);
+        return registerOnResult(listener, defaultResultExecutor);
     }
 
     @Override
-    public final synchronized ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
+    public final ResultFuture<V> onResult(ResultListener<V> listener, Executor resultExecutor) {
+        return registerOnResult(listener, resultExecutor);
+    }
+
+    synchronized ResultFuture<V> registerOnResult(ResultListener<V> listener, Executor resultExecutor) {
         if (isCancelled()) {
             return this;
         }
         if (isResultReady()) {
-            Result<V> result = this.result;
+            Result<V> result = getResult();
             if (result == null) {
                 result = await();
             }
             if (result != null) {
-                if (resultExecutor != null) {
-                    resultExecutor.execute(new OnResultRunnable<>(listener, result, cancelled));
-                } else {
-                    listener.onResult(result);
-                }
+                executeOnResult(listener, result, resultExecutor);
             }
         }
         if (this.listener == null) {
@@ -327,6 +328,14 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
         return this;
     }
 
+    protected void executeOnResult(ResultListener<V> listener, Result<V> result, @Nullable Executor executor) {
+        if (executor != null) {
+            executor.execute(new OnResultRunnable<>(listener, result, cancelled));
+        } else {
+            listener.onResult(result);
+        }
+    }
+
     @Override
     public ResultFuture<V> onSuccess(ValueListener<V> listener) {
         return onSuccess(listener, defaultResultExecutor);
@@ -334,7 +343,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
     @Override
     public ResultFuture<V> onSuccess(ValueListener<V> listener, Executor resultExecutor) {
-        return onResult(ResultFutures.successAdapter(listener), resultExecutor);
+        return registerOnResult(ResultFutures.successAdapter(listener), resultExecutor);
     }
 
     @Override
@@ -344,7 +353,7 @@ abstract class AbstractResultFuture<V> implements ResultFuture<V> {
 
     @Override
     public ResultFuture<V> onError(ExceptionListener listener, Executor resultExecutor) {
-        return onResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
+        return registerOnResult(ResultFutures.<V>errorAdapter(listener), resultExecutor);
     }
 
     @Override

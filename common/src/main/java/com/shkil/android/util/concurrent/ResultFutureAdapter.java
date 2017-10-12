@@ -30,10 +30,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
 
     private final ResultFuture<W> sourceFuture;
+    @GuardedBy("this")
+    private Result<W> originalResult;
+    @GuardedBy("this")
     private volatile Result<V> convertedResult;
     private final Executor converterExecutor;
 
@@ -64,13 +68,11 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
 
     @SuppressWarnings({"unchecked"})
     protected Result<V> handleResult(@NonNull Result<W> result) {
-        if (convertedResult != null) {
-            return convertedResult;
-        }
         synchronized (this) {
-            if (convertedResult != null) {
+            if (convertedResult != null && result == originalResult) {
                 return convertedResult;
             }
+            originalResult = result;
             if (result.isInterrupted()) {
                 return convertedResult = (Result<V>) result;
             }

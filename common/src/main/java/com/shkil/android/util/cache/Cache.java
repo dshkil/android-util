@@ -15,9 +15,17 @@
  */
 package com.shkil.android.util.cache;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
 public interface Cache<K, V> {
 
     V get(K key);
+
+    @NonNull
+    Result<V> get(K key, @Nullable CacheControl cacheControl);
+
+    boolean isCacheControlSupported();
 
     V put(K key, V value);
 
@@ -30,4 +38,51 @@ public interface Cache<K, V> {
     Object getSyncLock();
 
     boolean isQuick();
+
+    enum Status {
+        NONE, GOOD, STALE
+    }
+
+    class Result<V> {
+        private final V value;
+        private final Status status;
+        private static final Result<?> NONE = new Result<>(null, Status.NONE);
+
+        public static <T> Result<T> none() {
+            return (Result<T>) NONE;
+        }
+
+        public static <T> Result<T> normal(T value) {
+            return new Result<>(value, Status.GOOD);
+        }
+
+        public static <T> Result<T> normalOrNone(T value) {
+            return value != null ? normal(value) : Result.<T>none();
+        }
+
+        public static <T> Result<T> stale(T value) {
+            return new Result<>(value, Status.STALE);
+        }
+
+        private Result(V value, Status status) {
+            this.value = value;
+            this.status = status;
+        }
+
+        public V getValue() {
+            return value;
+        }
+
+        public Status getStatus() {
+            return status;
+        }
+
+        @Override
+        public String toString() {
+            return "Result{" +
+                    "status=" + status +
+                    ", value=" + value +
+                    '}';
+        }
+    }
 }
