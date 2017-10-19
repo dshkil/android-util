@@ -87,6 +87,11 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
     }
 
     @Override
+    public V put(K key, Entry<V> entry) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void clear() {
         K oldKey;
         V oldValue;

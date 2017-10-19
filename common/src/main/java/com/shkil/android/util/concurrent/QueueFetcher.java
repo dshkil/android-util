@@ -66,7 +66,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     private final List<FetcherListener<K, V>> listeners = new ArrayList<>(5);
 
     @GuardedBy("lock")
-    private volatile Cache<K, Result<V>> quickCache;
+    private volatile Cache<K, V> quickCache;
 
     @GuardedBy("lock")
     private volatile Cache<K, V> secondaryCache;
@@ -158,7 +158,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     /**
      * Set a primary cache. A quick cache only is allowed here
      */
-    public QueueFetcher<K, V> setCache(Cache<K, Result<V>> cache) {
+    public QueueFetcher<K, V> setCache(Cache<K, V> cache) {
         if (!cache.isQuick()) {
             throw new IllegalArgumentException("Attempt to set non-quick cache. Use setSecondaryCache() instead.");
         }
@@ -168,7 +168,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         return this;
     }
 
-    public Cache<K, Result<V>> getCache() {
+    public Cache<K, V> getCache() {
         return quickCache;
     }
 
@@ -219,7 +219,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     }
 
     @Override
-    public ResultFuture<V> fetch(K key, @Nullable RequestParams params) {
+    public ResultFuture<V> fetch(final K key, @Nullable RequestParams params) {
         if (params == null) {
             params = defaultRequestParams;
         }
@@ -229,29 +229,44 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         boolean forceExecute = (priority == Priority.IMMEDIATE);
         V staleResult = null;
         CacheControl cacheControl = params.cacheControl();
+        boolean cacheAllowed = cacheControl.isCacheAllowed();
         synchronized (lock) {
-            if (quickCache != null) {
-                if (quickCache.isCacheControlSupported()) {
-                    Cache.Entry<Result<V>> cacheEntry = quickCache.getEntry(key);
+            if (quickCache != null && cacheAllowed) {
+                if (quickCache.isCacheControlSupported() && cacheControl.isTimeLimited()) {
+                    Cache.Entry<V> cacheEntry = quickCache.getEntry(key);
                     if (cacheEntry != null) {
                         switch (cacheEntry.check(cacheControl)) {
                             case GOOD:
-                                return ResultFutures.result(cacheEntry.getValue());
+                                return ResultFutures.success(cacheEntry.getValue());
                             case STALE:
-                                staleResult = cacheEntry.getValue().getValue();
+                                staleResult = cacheEntry.getValue();
                                 break;
                         }
                     }
                 } else {
-                    Result<V> value = quickCache.get(key);
+                    V value = quickCache.get(key);
                     if (value != null) {
-                        return ResultFutures.result(value);
+                        return ResultFutures.success(value);
                     }
                 }
             }
             if (cacheControl.cacheOnly()) {
                 if (staleResult != null) {
                     return ResultFutures.success(staleResult);
+                }
+                if (secondaryCache != null && cacheAllowed) {
+                    final RequestParams finalParams = params;
+                    return ResultFutures.executeTask(new Callable<V>() {
+                        @Override
+                        public V call() throws Exception {
+                            V value = getValueFromSecondaryCache(key, finalParams);
+//                            Cache<K, V> quickCache = QueueFetcher.this.quickCache;
+//                            if (value != null && quickCache != null) {
+//                                quickCache.put(key, value);
+//                            }
+                            return value;
+                        }
+                    }, AsyncTask.SERIAL_EXECUTOR).getResultFuture(defaultResultExecutor, false);
                 }
                 return ResultFutures.failure(new NotFoundException());
             }
@@ -280,8 +295,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                 task.storeToCache(true);
             }
             DeferredFetchingFuture deferredFuture = new DeferredFetchingFuture(task, priorityOrdinal, mayInterruptTask);
-            if (staleResult != null) {
-                deferredFuture.setStaleResult(staleResult, params.allowInterim());
+            if (cacheAllowed) {
+                if (staleResult != null) {
+                    deferredFuture.setStaleResult(staleResult, params);
+                } else if (secondaryCache != null) {
+                    deferredFuture.fetchFromCache(key, secondaryCache, params);
+                }
             }
             task.addListener(deferredFuture);
             future = deferredFuture;
@@ -330,8 +349,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     @GuardedBy("lock")
     protected void putResultToCache(final K key, final Result<V> result) {
         if (result.isSuccess()) {
+            final V value = result.getValue();
             if (quickCache != null) {
-                quickCache.put(key, result);
+                quickCache.put(key, value);
             }
             final Cache<K, V> secondaryCache = this.secondaryCache;
             if (secondaryCache != null) {
@@ -339,7 +359,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                     @Override
                     public void run() {
                         try {
-                            secondaryCache.put(key, result.getValue());
+                            secondaryCache.put(key, value);
                         } catch (RuntimeException ex) {
                             Log.e(TAG, "Error putting value into secondary cache", ex);
                         }
@@ -362,17 +382,6 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             super(new Callable<Result<V>>() {
                 @Override
                 public Result<V> call() throws Exception {
-                    Cache<K, V> secondaryCache = QueueFetcher.this.secondaryCache;
-                    if (secondaryCache != null) {
-                        try {
-                            V value = secondaryCache.get(key);
-                            if (value != null) {
-                                return Result.success(value);
-                            }
-                        } catch (RuntimeException ex) {
-                            Log.e(TAG, "Error getting value from secondary cache", ex);
-                        }
-                    }
                     Result<V> result;
                     try {
                         result = Result.success(fetchValue(key));
@@ -562,7 +571,10 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @Override
-        public void onResult(K key, Result<V> result) {
+        public synchronized void onResult(K key, Result<V> result) {
+            if (task == null) {
+                return;
+            }
             if (allowInterim || staleResult == null || result.isSuccess()) {
                 super.fireResult(result);
             } else {
@@ -580,12 +592,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             return priority;
         }
 
-        public synchronized void setStaleResult(V staleResult, boolean allowInterim) {
+        public synchronized void setStaleResult(V staleResult, RequestParams params) {
+            this.allowInterim = params.allowInterim();
             if (allowInterim) {
                 fireResult(Result.intermediate(staleResult));
             }
             this.staleResult = staleResult;
-            this.allowInterim = allowInterim;
         }
 
         @Override
@@ -607,5 +619,105 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             }
             return super.registerOnResult(listener, resultExecutor);
         }
+
+        public void fetchFromCache(final K key, final Cache<K, V> cache, final RequestParams params) {
+            this.allowInterim = params.allowInterim();
+            final CacheControl cacheControl = params.cacheControl();
+            AsyncTask.SERIAL_EXECUTOR.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (cache.isCacheControlSupported() && cacheControl.isTimeLimited()) {
+                            Cache.Entry<V> cacheEntry = cache.getEntry(key);
+                            if (cacheEntry != null) {
+                                switch (cacheEntry.check(cacheControl)) {
+                                    case GOOD:
+                                        onResult(key, Result.success(cacheEntry.getValue()));
+                                        break;
+                                    case STALE:
+                                        synchronized (DeferredFetchingFuture.this) {
+                                            staleResult = cacheEntry.getValue();
+                                            if (allowInterim) {
+
+                                            }
+                                        }
+                                        break;
+                                }
+                            }
+                        } else {
+                            V value = cache.get(key);
+                            if (value != null) {
+                                onResult(key, Result.success(value));
+                            }
+                        }
+                    } catch (RuntimeException ex) {
+                        Log.e(TAG, "Error getting value from secondary cache", ex);
+                    }
+                }
+            });
+        }
+    }
+
+    private void fetchFromCache(final Cache<K, V> cache, final K key, final RequestParams params, final LatchResultFuture<V> resultFuture) {
+        AsyncTask.SERIAL_EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                CacheControl cacheControl = params.cacheControl();
+                try {
+                    if (cache.isCacheControlSupported() && cacheControl.isTimeLimited()) {
+                        Cache.Entry<V> cacheEntry = cache.getEntry(key);
+                        if (cacheEntry != null) {
+                            switch (cacheEntry.check(cacheControl)) {
+                                case GOOD:
+                                case STALE:
+                                    resultFuture.setSuccess(cacheEntry.getValue());
+                                    return;
+                            }
+                        }
+                    } else {
+                        V value = cache.get(key);
+                        if (value != null) {
+                            resultFuture.setSuccess(value);
+                            return;
+                        }
+                    }
+                } catch (RuntimeException ex) {
+                    Log.e(TAG, "Error getting value from secondary cache", ex);
+                }
+                resultFuture.setFailure(new NotFoundException());
+            }
+        });
+    }
+
+    private V getValueFromSecondaryCache(K key, final RequestParams params) throws NotFoundException {
+        Cache<K, V> secondaryCache = this.secondaryCache;
+        Cache<K, V> quickCache = this.quickCache;
+        if (secondaryCache == null) {
+            return null;
+        }
+        CacheControl cacheControl = params.cacheControl();
+        try {
+            if (secondaryCache.isCacheControlSupported() && cacheControl.isTimeLimited()) {
+                Cache.Entry<V> cacheEntry = secondaryCache.getEntry(key);
+                if (cacheEntry != null) {
+                    if (quickCache != null) {
+                        quickCache.put(key, cacheEntry);
+                    }
+                    switch (cacheEntry.check(cacheControl)) {
+                        case GOOD:
+                        case STALE:
+                            return cacheEntry.getValue();
+                    }
+                }
+            } else {
+                V value = secondaryCache.get(key);
+                if (value != null) {
+                    return value;
+                }
+            }
+        } catch (RuntimeException ex) {
+            Log.e(TAG, "Error getting value from secondary cache", ex);
+        }
+        throw new NotFoundException();
     }
 }

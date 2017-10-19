@@ -37,6 +37,18 @@ public abstract class CacheControl {
 
     public abstract Builder toBuilder();
 
+    public boolean isCacheAllowed() {
+        return maxAgeSeconds() > 0 || maxStaleSeconds() > 0;
+    }
+
+    public boolean isCacheDisallowed() {
+        return maxAgeSeconds() <= 0 && maxStaleSeconds() <= 0;
+    }
+
+    public boolean isTimeLimited() {
+        return maxAgeSeconds() < Integer.MAX_VALUE || maxStaleSeconds() < Integer.MAX_VALUE;
+    }
+
     public static Builder builder() {
         return new AutoValue_CacheControl.Builder()
                 .cacheOnly(false)

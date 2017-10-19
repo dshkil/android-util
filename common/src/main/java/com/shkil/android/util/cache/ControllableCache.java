@@ -46,6 +46,12 @@ public class ControllableCache<K, V> implements Cache<K, V> {
     }
 
     @Override
+    public V put(K key, Cache.Entry<V> entry) {
+        Entry<V> oldEntry = cache.put(key, new Entry<>(entry));
+        return oldEntry != null ? oldEntry.getValue() : null;
+    }
+
+    @Override
     public V remove(K key) {
         Entry<V> entry = cache.remove(key);
         return entry != null ? entry.getValue() : null;
@@ -89,6 +95,11 @@ public class ControllableCache<K, V> implements Cache<K, V> {
         public Entry(V value, long timestamp) {
             super(value);
             this.timestamp = timestamp;
+        }
+
+        public Entry(Cache.Entry<V> entry) {
+            super(entry.getValue());
+            this.timestamp = entry.getTimestamp();
         }
 
         @Override

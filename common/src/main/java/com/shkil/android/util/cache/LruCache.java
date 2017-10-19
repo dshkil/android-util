@@ -155,6 +155,11 @@ public class LruCache<K, V> implements Cache<K, V> {
         return previous;
     }
 
+    @Override
+    public V put(K key, Entry<V> entry) {
+        return put(key, entry.getValue());
+    }
+
     /**
      * @param maxSize the maximum size of the cache before returning. May be -1
      *                to evict even 0-sized elements.
