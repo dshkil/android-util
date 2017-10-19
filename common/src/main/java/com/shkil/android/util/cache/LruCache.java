@@ -17,11 +17,6 @@
 
 package com.shkil.android.util.cache;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-
-import com.shkil.android.util.cache.ControllableCache.CacheEntry;
-
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -54,7 +49,7 @@ public class LruCache<K, V> implements Cache<K, V> {
     }
 
     public static <K, V> Cache<K, V> newControllableCache(int maxSize) {
-        return new ControllableCache<>(new LruCache<K, CacheEntry<V>>(maxSize));
+        return new ControllableCache<>(new LruCache<K, ControllableCache.Entry<V>>(maxSize));
     }
 
     /**
@@ -125,10 +120,9 @@ public class LruCache<K, V> implements Cache<K, V> {
         }
     }
 
-    @NonNull
     @Override
-    public Result<V> get(K key, @Nullable CacheControl cacheControl) {
-        return Result.normalOrNone(get(key));
+    public Entry getEntry(K key) {
+        return Entry.of(get(key));
     }
 
     /**

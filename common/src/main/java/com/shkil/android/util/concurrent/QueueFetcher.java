@@ -26,6 +26,8 @@ import com.shkil.android.util.Result;
 import com.shkil.android.util.ResultListener;
 import com.shkil.android.util.ValueFetcher;
 import com.shkil.android.util.cache.Cache;
+import com.shkil.android.util.cache.CacheControl;
+import com.shkil.android.util.exception.NotFoundException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -226,16 +228,17 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         ResultFuture<V> future;
         boolean forceExecute = (priority == Priority.IMMEDIATE);
         V staleResult = null;
+        CacheControl cacheControl = params.cacheControl();
         synchronized (lock) {
             if (quickCache != null) {
                 if (quickCache.isCacheControlSupported()) {
-                    Cache.Result<Result<V>> cacheResult = quickCache.get(key, params.cacheControl());
-                    if (cacheResult != null) {
-                        switch (cacheResult.getStatus()) {
+                    Cache.Entry<Result<V>> cacheEntry = quickCache.getEntry(key);
+                    if (cacheEntry != null) {
+                        switch (cacheEntry.check(cacheControl)) {
                             case GOOD:
-                                return ResultFutures.result(cacheResult.getValue());
+                                return ResultFutures.result(cacheEntry.getValue());
                             case STALE:
-                                staleResult = cacheResult.getValue().getValue();
+                                staleResult = cacheEntry.getValue().getValue();
                                 break;
                         }
                     }
@@ -245,6 +248,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                         return ResultFutures.result(value);
                     }
                 }
+            }
+            if (cacheControl.cacheOnly()) {
+                if (staleResult != null) {
+                    return ResultFutures.success(staleResult);
+                }
+                return ResultFutures.failure(new NotFoundException());
             }
             long priorityOrdinal = priority.toLong(SystemClock.uptimeMillis());
             task = runningTasks.get(key);
@@ -267,7 +276,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                 }
             }
             task.incrementUseCount();
-            if (!params.cacheControl().noStore()) {
+            if (!cacheControl.noStore()) {
                 task.storeToCache(true);
             }
             DeferredFetchingFuture deferredFuture = new DeferredFetchingFuture(task, priorityOrdinal, mayInterruptTask);

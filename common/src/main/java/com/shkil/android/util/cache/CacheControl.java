@@ -25,7 +25,6 @@ public abstract class CacheControl {
     public static final CacheControl INFINITE = builder().build();
     public static final CacheControl CACHE_ONLY = builder().cacheOnly(true).build();
     public static final CacheControl NO_CACHE = builder().maxAgeSeconds(0).maxStaleSeconds(0).build();
-    public static final CacheControl NO_STORE = builder().noStore(true).build();
     public static final CacheControl REFRESH = builder().maxAgeSeconds(0).build();
 
     public abstract boolean cacheOnly();

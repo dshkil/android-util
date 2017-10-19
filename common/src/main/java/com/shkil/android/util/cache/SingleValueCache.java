@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Dmytro Shkil
+ * Copyright (C) 2017 Dmytro Shkil
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
  */
 package com.shkil.android.util.cache;
 
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+
+import static java.lang.System.currentTimeMillis;
 
 /**
  * Implementation of cache to keep one latest pair of key-value
@@ -25,9 +26,10 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
 
     private volatile K key;
     private volatile V value;
+    private volatile long timestamp;
 
     public static <K, V> SingleValueCache<K, V> newCache() {
-        return new SingleValueCache<K, V>();
+        return new SingleValueCache<>();
     }
 
     @Override
@@ -40,10 +42,14 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
         }
     }
 
-    @NonNull
     @Override
-    public Result<V> get(K key, @Nullable CacheControl cacheControl) {
-        return Result.normalOrNone(get(key));
+    @Nullable
+    public Entry<V> getEntry(K key) {
+        V value = get(key);
+        if (value != null) {
+            return new ControllableCache.Entry<>(value, timestamp);
+        }
+        return null;
     }
 
     @Override
@@ -56,6 +62,7 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
         V removedValue;
         boolean evicted;
         synchronized (getSyncLock()) {
+            this.timestamp = currentTimeMillis();
             if (key.equals(this.key)) {
                 oldValue = this.value;
                 if (equal(value, oldValue)) {
@@ -77,10 +84,6 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
             entryRemoved(evicted, removedKey, removedValue, null);
         }
         return oldValue;
-    }
-
-    protected V create(K key) {
-        return null;
     }
 
     @Override
@@ -110,7 +113,7 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
 
     @Override
     public boolean isCacheControlSupported() {
-        return false;
+        return true;
     }
 
     @Override
@@ -142,9 +145,4 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
     public int size() {
         return key == null ? 0 : 1;
     }
-
-    public int maxSize() {
-        return 1;
-    }
-
 }

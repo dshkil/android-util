@@ -15,57 +15,39 @@
  */
 package com.shkil.android.util.cache;
 
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import static java.lang.System.currentTimeMillis;
 
 public class ControllableCache<K, V> implements Cache<K, V> {
 
-    private final Cache<K, CacheEntry<V>> cache;
+    private final Cache<K, Entry<V>> cache;
 
-    public ControllableCache(Cache<K, CacheEntry<V>> cache) {
+    public ControllableCache(Cache<K, Entry<V>> cache) {
         this.cache = cache;
     }
 
     @Override
     public V get(K key) {
-        CacheEntry<V> entry = cache.get(key);
+        Entry<V> entry = cache.get(key);
         return entry != null ? entry.getValue() : null;
     }
 
-    public CacheEntry<V> getEntry(K key) {
-        return cache.get(key);
-    }
-
-    @NonNull
+    @Nullable
     @Override
-    public Result<V> get(K key, @Nullable CacheControl cacheControl) {
-        if (cacheControl == null) {
-            return Result.normalOrNone(get(key));
-        }
-        CacheEntry<V> entry = cache.get(key);
-        if (entry != null) {
-            int ageSeconds = (int) ((currentTimeMillis() - entry.getTimestamp()) / 1000);
-            if (ageSeconds <= cacheControl.maxAgeSeconds()) {
-                return Result.normal(entry.getValue());
-            }
-            if (ageSeconds <= cacheControl.maxStaleSeconds()) {
-                return Result.stale(entry.getValue());
-            }
-        }
-        return null;
+    public Entry<V> getEntry(K key) {
+        return cache.get(key);
     }
 
     @Override
     public V put(K key, V value) {
-        CacheEntry<V> entry = cache.put(key, new CacheEntry<>(value, currentTimeMillis()));
+        Entry<V> entry = cache.put(key, new Entry<>(value, currentTimeMillis()));
         return entry != null ? entry.getValue() : null;
     }
 
     @Override
     public V remove(K key) {
-        CacheEntry<V> entry = cache.remove(key);
+        Entry<V> entry = cache.remove(key);
         return entry != null ? entry.getValue() : null;
     }
 
@@ -101,29 +83,17 @@ public class ControllableCache<K, V> implements Cache<K, V> {
                 '}';
     }
 
-    public static class CacheEntry<V> {
-        private final V value;
+    protected static class Entry<V> extends Cache.Entry<V> {
         private final long timestamp;
 
-        public CacheEntry(V value, long timestamp) {
-            this.value = value;
+        public Entry(V value, long timestamp) {
+            super(value);
             this.timestamp = timestamp;
         }
 
-        public V getValue() {
-            return value;
-        }
-
+        @Override
         public long getTimestamp() {
             return timestamp;
-        }
-
-        @Override
-        public String toString() {
-            return "CacheEntry{" +
-                    "value=" + value +
-                    ", timestamp=" + timestamp +
-                    '}';
         }
     }
 }

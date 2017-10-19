@@ -18,12 +18,14 @@ package com.shkil.android.util.cache;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import static java.lang.System.currentTimeMillis;
+
 public interface Cache<K, V> {
 
     V get(K key);
 
-    @NonNull
-    Result<V> get(K key, @Nullable CacheControl cacheControl);
+    @Nullable
+    Entry<V> getEntry(K key);
 
     boolean isCacheControlSupported();
 
@@ -39,49 +41,54 @@ public interface Cache<K, V> {
 
     boolean isQuick();
 
-    enum Status {
-        NONE, GOOD, STALE
-    }
-
-    class Result<V> {
-        private final V value;
-        private final Status status;
-        private static final Result<?> NONE = new Result<>(null, Status.NONE);
-
-        public static <T> Result<T> none() {
-            return (Result<T>) NONE;
+    class Entry<T> {
+        public enum Status {
+            GOOD, STALE, BAD
         }
 
-        public static <T> Result<T> normal(T value) {
-            return new Result<>(value, Status.GOOD);
+        private final T value;
+
+        @Nullable
+        public static <T> Entry<T> of(@Nullable T value) {
+            return value != null ? new Entry<>(value) : null;
         }
 
-        public static <T> Result<T> normalOrNone(T value) {
-            return value != null ? normal(value) : Result.<T>none();
-        }
-
-        public static <T> Result<T> stale(T value) {
-            return new Result<>(value, Status.STALE);
-        }
-
-        private Result(V value, Status status) {
+        protected Entry(T value) {
             this.value = value;
-            this.status = status;
         }
 
-        public V getValue() {
+        public T getValue() {
             return value;
         }
 
-        public Status getStatus() {
-            return status;
+        public long getTimestamp() {
+            return 0;
+        }
+
+        @NonNull
+        public Status check(@Nullable CacheControl cacheControl) {
+            if (cacheControl == null) {
+                return Status.GOOD;
+            }
+            long timestamp = getTimestamp();
+            if (timestamp <= 0) {
+                return Status.GOOD;
+            }
+            int ageSeconds = (int) ((currentTimeMillis() - timestamp) / 1000);
+            if (ageSeconds <= cacheControl.maxAgeSeconds()) {
+                return Status.GOOD;
+            }
+            if (ageSeconds <= cacheControl.maxStaleSeconds()) {
+                return Status.STALE;
+            }
+            return Status.BAD;
         }
 
         @Override
         public String toString() {
-            return "Result{" +
-                    "status=" + status +
-                    ", value=" + value +
+            return "Entry{" +
+                    "value=" + value +
+                    ", timestamp=" + getTimestamp() +
                     '}';
         }
     }
