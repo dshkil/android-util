@@ -657,7 +657,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             });
         }
     }
-
+/*
     private void fetchFromCache(final Cache<K, V> cache, final K key, final RequestParams params, final LatchResultFuture<V> resultFuture) {
         AsyncTask.SERIAL_EXECUTOR.execute(new Runnable() {
             @Override
@@ -688,7 +688,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             }
         });
     }
-
+*/
     private V getValueFromSecondaryCache(K key, final RequestParams params) throws NotFoundException {
         Cache<K, V> secondaryCache = this.secondaryCache;
         Cache<K, V> quickCache = this.quickCache;
@@ -712,6 +712,9 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             } else {
                 V value = secondaryCache.get(key);
                 if (value != null) {
+                    if (quickCache != null) {
+                        quickCache.put(key, value);
+                    }
                     return value;
                 }
             }

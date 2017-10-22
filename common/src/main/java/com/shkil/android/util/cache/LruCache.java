@@ -49,7 +49,7 @@ public class LruCache<K, V> implements Cache<K, V> {
     }
 
     public static <K, V> Cache<K, V> newControllableCache(int maxSize) {
-        return new ControllableCache<>(new LruCache<K, ControllableCache.Entry<V>>(maxSize));
+        return new ControllableCache<>(new LruCache<K, Entry<V>>(maxSize));
     }
 
     /**
@@ -122,7 +122,7 @@ public class LruCache<K, V> implements Cache<K, V> {
 
     @Override
     public Entry getEntry(K key) {
-        return Entry.of(get(key));
+        return Entry.of(get(key), 0);
     }
 
     /**

@@ -49,14 +49,16 @@ public interface Cache<K, V> {
         }
 
         private final T value;
+        private final long timestamp;
 
         @Nullable
-        public static <T> Entry<T> of(@Nullable T value) {
-            return value != null ? new Entry<>(value) : null;
+        public static <T> Entry<T> of(@Nullable T value, long timestamp) {
+            return value != null ? new Entry<>(value, timestamp) : null;
         }
 
-        protected Entry(T value) {
+        public Entry(T value, long timestamp) {
             this.value = value;
+            this.timestamp = timestamp;
         }
 
         public T getValue() {
@@ -64,7 +66,7 @@ public interface Cache<K, V> {
         }
 
         public long getTimestamp() {
-            return 0;
+            return timestamp;
         }
 
         @NonNull
