@@ -17,6 +17,8 @@
 
 package com.shkil.android.util.cache;
 
+import android.support.annotation.NonNull;
+
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -156,7 +158,7 @@ public class LruCache<K, V> implements Cache<K, V> {
     }
 
     @Override
-    public V put(K key, Entry<V> entry) {
+    public V put(K key, @NonNull Entry<V> entry) {
         return put(key, entry.getValue());
     }
 

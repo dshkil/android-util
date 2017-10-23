@@ -31,7 +31,7 @@ public interface Cache<K, V> {
 
     V put(K key, V value);
 
-    V put(K key, Entry<V> entry);
+    V put(K key, @NonNull Entry<V> entry);
 
     V remove(K key);
 

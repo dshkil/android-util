@@ -15,6 +15,7 @@
  */
 package com.shkil.android.util.cache;
 
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import static java.lang.System.currentTimeMillis;
@@ -47,7 +48,7 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
     public Entry<V> getEntry(K key) {
         V value = get(key);
         if (value != null) {
-            return new ControllableCache.Entry<>(value, timestamp);
+            return new Entry<>(value, timestamp);
         }
         return null;
     }
@@ -87,8 +88,12 @@ public class SingleValueCache<K, V> implements Cache<K, V> {
     }
 
     @Override
-    public V put(K key, Entry<V> entry) {
-        throw new UnsupportedOperationException();
+    public V put(K key, @NonNull Entry<V> entry) {
+        synchronized (getSyncLock()) {
+            V result = put(key, entry.getValue());
+            this.timestamp = entry.getTimestamp();
+            return result;
+        }
     }
 
     @Override
