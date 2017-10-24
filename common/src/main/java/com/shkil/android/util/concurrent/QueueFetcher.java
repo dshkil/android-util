@@ -76,6 +76,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
 
     private volatile RequestParams defaultRequestParams = RequestParams.DEFAULT;
 
+    private static final Executor asyncTaskExecutor = AsyncTask.THREAD_POOL_EXECUTOR;
+
+    private interface FetcherListenerWithPriority<K, V> extends FetcherListener<K, V> {
+        long getPriority();
+    }
+
     private static class QueueKey<K> implements Comparable<QueueKey> {
         private final K key;
         private final int hashCode;
@@ -250,20 +256,26 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             if (staleResult != null && cacheControl.cacheOnly()) {
                 return ResultFutures.success(staleResult);
             }
-            if (secondaryCache != null && cacheAllowed) {
-                return ResultFutures.executeTask(new SecondaryCacheCallable(key, params), AsyncTask.THREAD_POOL_EXECUTOR)
-                        .getResultFuture(defaultResultExecutor, false);
+            if (staleResult == null && secondaryCache != null && cacheAllowed) {
+                LatchFetchingFuture resultFuture = new LatchFetchingFuture();
+                asyncTaskExecutor.execute(new SecondaryCacheRunnable(key, params, resultFuture));
+                return resultFuture;
+            } else {
+                return getTaskResultFuture(key, params, deferredFetchingFutureFactory, staleResult);
             }
-            return getTaskResultFuture(key, params, staleResult);
         }
     }
 
+    private abstract class ResultFutureFactory<V> {
+        abstract ResultFuture<V> createResultFuture(RequestParams params, @Nullable V staleResult, long priorityOrdinal, FetcherTask task);
+    }
+
     @NonNull
-    private ResultFuture<V> getTaskResultFuture(K key, RequestParams params, @Nullable V staleResult) {
-        Priority priority = params.priority();
+    @GuardedBy("lock")
+    private ResultFuture<V> getTaskResultFuture(K key, RequestParams params, ResultFutureFactory<V> resultFactory, @Nullable V staleResult) {
         CacheControl cacheControl = params.cacheControl();
+        Priority priority = params.priority();
         boolean forceExecute = (priority == Priority.IMMEDIATE);
-        ResultFuture<V> future;
         long priorityOrdinal = priority.toLong(SystemClock.uptimeMillis());
         FetcherTask task = runningTasks.get(key);
         if (task == null) {
@@ -288,17 +300,24 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         if (!cacheControl.noStore()) {
             task.storeToCache(true);
         }
-        DeferredFetchingFuture deferredFuture = new DeferredFetchingFuture(task, priorityOrdinal, mayInterruptTask);
-        if (staleResult != null) {
-            deferredFuture.setStaleResult(staleResult, params);
-        }
-        task.addListener(deferredFuture);
-        future = deferredFuture;
+        ResultFuture<V> resultFuture = resultFactory.createResultFuture(params, staleResult, priorityOrdinal, task);
         if (forceExecute) {
-            executor.execute(task); //FIXME
+            executor.execute(task);
         }
-        return future;
+        return resultFuture;
     }
+
+    private final ResultFutureFactory<V> deferredFetchingFutureFactory = new ResultFutureFactory<V>() {
+        @Override
+        ResultFuture<V> createResultFuture(RequestParams params, @Nullable V staleResult, long priority, FetcherTask task) {
+            DeferredFetchingFuture resultFuture = new DeferredFetchingFuture(task, priority, mayInterruptTask);
+            if (staleResult != null) {
+                resultFuture.setStaleResult(staleResult, params);
+            }
+            task.addListener(resultFuture);
+            return resultFuture;
+        }
+    };
 
     @TargetApi(Build.VERSION_CODES.GINGERBREAD)
     protected void fireTaskQueueExecutor() {
@@ -361,7 +380,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
     private class FetcherTask extends FutureTask<Result<V>> {
         private final K key;
         @GuardedBy("lock")
-        private final List<DeferredFetchingFuture> listeners = new ArrayList<DeferredFetchingFuture>(4);
+        private final List<FetcherListenerWithPriority> listeners = new ArrayList<>(4);
         @GuardedBy("lock")
         private int useCount;
         @GuardedBy("lock")
@@ -426,17 +445,17 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
 
         @GuardedBy("lock")
-        protected void addListener(DeferredFetchingFuture listener) {
+        protected void addListener(FetcherListenerWithPriority listener) {
             listeners.add(listener);
         }
 
         @GuardedBy("lock")
-        protected void removeListener(DeferredFetchingFuture listener) {
+        protected void removeListener(FetcherListenerWithPriority listener) {
             listeners.remove(listener);
         }
 
         @GuardedBy("lock")
-        protected List<DeferredFetchingFuture> getListeners() {
+        protected List<FetcherListenerWithPriority> getListeners() {
             return listeners;
         }
 
@@ -466,12 +485,12 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
-    private long findMaxPriority(List<DeferredFetchingFuture> futures) {
+    private long findMaxPriority(List<FetcherListenerWithPriority> futures) {
         if (futures == null || futures.isEmpty()) {
             return 0;
         }
         long result = 0;
-        for (DeferredFetchingFuture future : futures) {
+        for (FetcherListenerWithPriority future : futures) {
             long priority = future.getPriority();
             if (priority > result) {
                 result = priority;
@@ -492,12 +511,13 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
         }
     }
 
-    private class DeferredFetchingFuture extends AbstractResultFuture<V> implements FetcherListener<K, V> {
+    private class DeferredFetchingFuture extends AbstractResultFuture<V> implements FetcherListenerWithPriority<K, V> {
         private volatile FetcherTask task;
         private final long priority;
         private final boolean mayInterruptTask;
         @GuardedBy("this")
         private V staleResult;
+        @GuardedBy("this")
         private boolean allowInterim;
 
         public DeferredFetchingFuture(FetcherTask task, long priority, boolean mayInterruptTask) {
@@ -546,7 +566,7 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                     task.removeListener(this);
                     QueueKey key = new QueueKey(task.getKey());
                     if (tasksQueue.remove(key) != null) {
-                        List<DeferredFetchingFuture> listeners = task.getListeners();
+                        List<FetcherListenerWithPriority> listeners = task.getListeners();
                         if (listeners != null && listeners.size() > 0) {
                             long maxPriority = findMaxPriority(listeners);
                             key.setPriority(maxPriority);
@@ -608,64 +628,91 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             }
             return super.registerOnResult(listener, resultExecutor);
         }
-
-        public void fetchFromCache(final K key, final Cache<K, V> cache, final RequestParams params) {
-            this.allowInterim = params.allowInterim();
-            final CacheControl cacheControl = params.cacheControl();
-            AsyncTask.SERIAL_EXECUTOR.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        if (cache.isCacheControlSupported() && cacheControl.isTimeLimited()) {
-                            Cache.Entry<V> cacheEntry = cache.getEntry(key);
-                            if (cacheEntry != null) {
-                                Cache<K, V> quickCache = QueueFetcher.this.quickCache;
-                                if (quickCache != null) {
-                                    quickCache.put(key, cacheEntry);
-                                }
-                                switch (cacheEntry.check(cacheControl)) {
-                                    case GOOD:
-                                        onResult(key, Result.success(cacheEntry.getValue()));
-                                        break;
-                                    case STALE:
-                                        synchronized (DeferredFetchingFuture.this) {
-                                            staleResult = cacheEntry.getValue();
-                                            if (allowInterim) {
-
-                                            }
-                                        }
-                                        break;
-                                }
-                            }
-                        } else {
-                            V value = cache.get(key);
-                            if (value != null) {
-                                Cache<K, V> quickCache = QueueFetcher.this.quickCache;
-                                if (quickCache != null) {
-                                    quickCache.put(key, value);
-                                }
-                                onResult(key, Result.success(value));
-                            }
-                        }
-                    } catch (RuntimeException ex) {
-                        Log.e(TAG, "Error getting value from secondary cache", ex);
-                    }
-                }
-            });
-        }
     }
 
-    private class SecondaryCacheCallable implements Callable<V> {
-        private final K key;
-        private final RequestParams params;
 
-        public SecondaryCacheCallable(K key, RequestParams params) {
-            this.key = key;
-            this.params = params;
+    private class LatchFetchingFuture extends LatchResultFuture<V> implements FetcherListenerWithPriority<K, V> {
+        private volatile long priority;
+        @GuardedBy("this")
+        private boolean allowInterim;
+        @GuardedBy("this")
+        private V staleResult;
+        private FetcherTask task;
+
+        public LatchFetchingFuture() {
+            super(QueueFetcher.this.defaultResultExecutor);
+        }
+
+        public void setTask(FetcherTask task, long priority) {
+            this.task = task;
+            this.priority = priority;
         }
 
         @Override
-        public V call() throws Exception {
+        public long getPriority() {
+            return priority;
+        }
+
+        @Override
+        protected void onCompleted(boolean cancelled) {
+            super.onCompleted(cancelled);
+            FetcherTask task = this.task;
+            if (task != null) {
+                task.cancel(mayInterruptTask);
+            }
+        }
+
+        @Override
+        public synchronized void onResult(K key, Result<V> result) {
+            if (allowInterim || staleResult == null || result.isSuccess()) {
+                super.fireResult(result);
+            } else {
+                super.fireResult(Result.success(staleResult));
+            }
+        }
+
+        public synchronized void setStaleResult(V staleResult, RequestParams params) {
+            this.allowInterim = params.allowInterim();
+            this.staleResult = staleResult;
+        }
+
+        @Override
+        Result<V> getResult() {
+            Result<V> result = super.getResult();
+            if (allowInterim || staleResult == null || (result != null && result.isSuccess())) {
+                return result;
+            }
+            return Result.success(staleResult);
+        }
+
+        @Override
+        protected synchronized ResultFuture<V> registerOnResult(ResultListener<V> listener, Executor resultExecutor) {
+            Result<V> result = super.peekResult();
+            if (allowInterim) {
+                if (staleResult != null && (!isResultReady() || result.isNotSuccess())) {
+                    executeOnResult(listener, Result.intermediate(staleResult), resultExecutor);
+                }
+            }
+            return super.registerOnResult(listener, resultExecutor);
+        }
+    }
+
+    private class SecondaryCacheRunnable implements Runnable {
+        private final K key;
+        private final RequestParams params;
+        private final LatchFetchingFuture resultFuture;
+
+        public SecondaryCacheRunnable(K key, RequestParams params, LatchFetchingFuture resultFuture) {
+            this.key = key;
+            this.params = params;
+            this.resultFuture = resultFuture;
+        }
+
+        @Override
+        public void run() {
+            if (resultFuture.isCancelled()) {
+                return;
+            }
             Cache<K, V> secondaryCache = QueueFetcher.this.secondaryCache;
             Cache<K, V> quickCache = QueueFetcher.this.quickCache;
             CacheControl cacheControl = params.cacheControl();
@@ -679,7 +726,8 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                         }
                         switch (cacheEntry.check(cacheControl)) {
                             case GOOD:
-                                return cacheEntry.getValue();
+                                resultFuture.setSuccess(cacheEntry.getValue());
+                                return;
                             case STALE:
                                 staleResult = cacheEntry.getValue();
                                 break;
@@ -691,7 +739,8 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
                         if (quickCache != null) {
                             quickCache.put(key, value);
                         }
-                        return value;
+                        resultFuture.setSuccess(value);
+                        return;
                     }
                 }
             } catch (RuntimeException ex) {
@@ -699,13 +748,31 @@ public abstract class QueueFetcher<K, V> implements Fetcher<K, V> {
             }
             if (cacheControl.cacheOnly()) {
                 if (staleResult != null) {
-                    return staleResult;
+                    resultFuture.setSuccess(staleResult);
+                } else {
+                    resultFuture.setFailure(new NotFoundException());
                 }
-                throw new NotFoundException();
+                return;
             }
-            // TODO
-            getTaskResultFuture(key, params, staleResult).awaitValueOrThrow();
-            return null;
+            if (staleResult != null && params.allowInterim()) {
+                resultFuture.setIntermediate(staleResult);
+            }
+            if (resultFuture.isCancelled()) {
+                return;
+            }
+            synchronized (lock) {
+                getTaskResultFuture(key, params, new ResultFutureFactory<V>() {
+                    @Override
+                    ResultFuture<V> createResultFuture(RequestParams params, @Nullable V staleResult, long priority, FetcherTask task) {
+                        resultFuture.setTask(task, priority);
+                        if (staleResult != null) {
+                            resultFuture.setStaleResult(staleResult, params);
+                        }
+                        task.addListener(resultFuture);
+                        return resultFuture;
+                    }
+                }, staleResult);
+            }
         }
     }
 }

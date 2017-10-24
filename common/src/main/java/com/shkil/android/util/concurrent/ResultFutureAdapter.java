@@ -85,7 +85,7 @@ public abstract class ResultFutureAdapter<W, V> implements ResultFuture<V> {
             }
             try {
                 V value = convertValue(result.getValue());
-                return convertedResult = Result.success(value);
+                return convertedResult = Result.create(value, result.getStatus());
             } catch (Exception ex) {
                 return Result.failure(ex);
             }

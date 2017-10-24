@@ -28,6 +28,10 @@ public class Result<V> {
     private final Exception exception;
     private final Status status;
 
+    public static <V> Result<V> create(V value, Status status) {
+        return new Result<>(value, status);
+    }
+
     public static <V> Result<V> success(V value) {
         return new Result<>(value, Status.COMPLETED);
     }
