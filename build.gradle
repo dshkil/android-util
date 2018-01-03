@@ -1,20 +1,22 @@
 ext {
     minSdkVersion = 14
-    targetSdkVersion = 24
-    compileSdkVersion = 25
-    buildToolsVersion = '25.0.2'
+    targetSdkVersion = 26
+    compileSdkVersion = 26
+    buildToolsVersion = '26.0.3'
 
-    projectVersion = '0.9.66'
-    projectVersionCode = 66
+    projectVersion = '0.9.67'
+    projectVersionCode = 67
 }
 
 allprojects {
     buildscript {
         repositories {
+            google()
             jcenter()
         }
     }
     repositories {
+        google()
         jcenter()
     }
     apply from: rootProject.file('etc/app-support.gradle')
