@@ -40,6 +40,10 @@ import java.util.concurrent.Executor;
 
 import javax.annotation.concurrent.GuardedBy;
 
+import io.reactivex.Scheduler;
+import io.reactivex.Single;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.Call;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
@@ -80,6 +84,10 @@ public abstract class AbstractNetClient {
 
     private static class ThreadPoolExecutorLazyHolder {
         static final Executor EXECUTOR = newFixedThreadPool(4, newThreadFactory("net-client-pool-{0}"));
+    }
+
+    private static class SchedulerLazyHolder {
+        static final Scheduler SCHEDULER = Schedulers.from(ThreadPoolExecutorLazyHolder.EXECUTOR);
     }
 
     @GuardedBy("this")
@@ -310,6 +318,15 @@ public abstract class AbstractNetClient {
         });
     }
 
+    protected final Single<Response> executeAsyncRx(final Request request) {
+        return executeAsyncRx(new Callable<Response>() {
+            @Override
+            public Response call() throws Exception {
+                return execute(request);
+            }
+        });
+    }
+
     protected final <T> T execute(Request request, Class<T> resultType) throws IOException {
         return execute(request, (Type) resultType);
     }
@@ -354,6 +371,15 @@ public abstract class AbstractNetClient {
         });
     }
 
+    protected final <T> Single<T> executeAsyncRx(final Request request, final Type resultType) {
+        return executeAsyncRx(new Callable<T>() {
+            @Override
+            public T call() throws Exception {
+                return execute(request, resultType);
+            }
+        });
+    }
+
     protected final Response execute(RequestBuilder requestBuilder) throws IOException {
         return execute(requestBuilder, (Cancellator) null);
     }
@@ -368,6 +394,10 @@ public abstract class AbstractNetClient {
 
     protected final ResultFuture<Response> executeAsync(RequestBuilder requestBuilder) {
         return executeAsync(requestBuilder.build());
+    }
+
+    protected final Single<Response> executeAsyncRx(RequestBuilder requestBuilder) {
+        return executeAsyncRx(requestBuilder.build());
     }
 
     protected final <T> T execute(RequestBuilder requestBuilder, Class<T> resultType) throws IOException {
@@ -398,8 +428,16 @@ public abstract class AbstractNetClient {
         return executeAsync(requestBuilder, (Type) resultType);
     }
 
+    protected final <T> Single<T> executeAsyncRx(RequestBuilder requestBuilder, Class<T> resultType) {
+        return executeAsyncRx(requestBuilder, (Type) resultType);
+    }
+
     protected final <T> ResultFuture<T> executeAsync(RequestBuilder requestBuilder, Type resultType) {
         return executeAsync(requestBuilder.build(), resultType);
+    }
+
+    protected final <T> Single<T> executeAsyncRx(RequestBuilder requestBuilder, Type resultType) {
+        return executeAsyncRx(requestBuilder.build(), resultType);
     }
 
     protected final <T> ResultFuture<T> executeSerialAsync(RequestBuilder requestBuilder, T successValue) {
@@ -475,6 +513,16 @@ public abstract class AbstractNetClient {
 
     protected Executor getAsyncExecutor() {
         return ThreadPoolExecutorLazyHolder.EXECUTOR;
+    }
+
+    protected Scheduler getAsyncScheduler() {
+        return SchedulerLazyHolder.SCHEDULER;
+    }
+
+    protected <V> Single<V> executeAsyncRx(Callable<V> task) {
+        return Single.fromCallable(task)
+                .subscribeOn(getAsyncScheduler())
+                .observeOn(AndroidSchedulers.mainThread());
     }
 
     protected <V> ResultFuture<V> executeAsync(Callable<V> task) {
